@@ -1,0 +1,18 @@
+Metadata-Version: 2.1
+Name: libgs-ops
+Version: 0.1.0
+Summary: Ground station operation tools library
+Home-page: UNKNOWN
+Author: Kjetil Wormnes / University of New South Wales
+Author-email: kjetil@wormnes.com
+License: UNKNOWN
+Description: UNKNOWN
+Keywords: satellite spacecraft operations ground station predict
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Astronomy
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Provides-Extra: test

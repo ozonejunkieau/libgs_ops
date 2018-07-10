@@ -1,0 +1,7 @@
+pandas
+ephem
+requests
+lxml
+
+[test]
+pytest
