@@ -152,7 +152,7 @@ setup(
     # projects.
     extras_require={
         'test': ['pytest']
-    }
+    },
     #extras_require={  # Optional
     #    'dev': ['check-manifest'],
     #    'test': ['coverage'],
@@ -183,10 +183,10 @@ setup(
     # executes the function `main` from this package when invoked:
     entry_points={  # Optional
         'console_scripts': [
-            'libgs-download-tle=libgs.console_scripts:download_tle',
-            'libgs-propagate=libgs.console_scripts:propagate',
-            'libgs-commspass=libgs.console_scripts:commspass',
-            'libgs-schedule=libgs.console_scripts:schedule',
+            'libgs-download-tle=libgs_ops.console_scripts:download_tle',
+            'libgs-propagate=libgs_ops.console_scripts:propagate',
+            'libgs-commspass=libgs_ops.console_scripts:commspass',
+            'libgs-schedule=libgs_ops.console_scripts:schedule',
         ],
     }
 )
