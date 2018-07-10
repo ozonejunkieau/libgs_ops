@@ -39,6 +39,7 @@ import numpy as np
 import json
 import ephem
 import os
+from xmlrpclib import ServerProxy
 import logging
 log = logging.getLogger('libgs_ops_log')
 log.addHandler(logging.NullHandler())
@@ -695,6 +696,32 @@ class Schedule(object):
         return self.from_dict(d)
 
 
+
+class RPCSchedulerClient(object):
+    """
+    The RPCSchedulerClient class can replace the scheduler class in remote
+    operations. It connects to the RPCSchedulerClient on the ground station
+    for easy communication and execution of schedules.
+
+    """
+
+    def __init__(self, schedule, track_full_pass=False, compute_ant_points = True, rpcaddr='http://localhost:8000'):
+        self._rpcaddr =  rpcaddr
+        self._track_full_pass = track_full_pass
+        self._compute_ant_points = compute_ant_points
+        self.server = ServerProxy(self._rpcaddr, allow_none=True)
+        self._schedule = schedule
+
+    @property
+    def state(self):
+        return self.server.scheduler_state()
+
+
+    def execute(self, N=None):
+        self.server.execute_schedule(self._schedule.to_json(), self._track_full_pass, self._compute_ant_points, N)
+
+    def stop(self):
+        self.server.stop_schedule()
 
 
 
