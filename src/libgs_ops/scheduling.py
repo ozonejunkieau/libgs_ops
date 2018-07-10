@@ -45,7 +45,7 @@ log = logging.getLogger('libgs_ops_log')
 log.addHandler(logging.NullHandler())
 
 
-#####
+##########
 #Extract from utils
 ###
 def bytes2hex(data):
@@ -62,7 +62,7 @@ class Error(Exception):
 
 SCHEDULE_BUFFERTIME = 180
 
-######
+############
 
 
 class Action(dict):

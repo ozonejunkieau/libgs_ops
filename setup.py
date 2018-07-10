@@ -181,14 +181,12 @@ setup(
     #
     # For example, the following would provide a command called `sample` which
     # executes the function `main` from this package when invoked:
-    #entry_points={  # Optional
-    #    'console_scripts': [
-    #        'libgs-download-tle=libgs.console_scripts:download_tle',
-    #        'libgs-propagate=libgs.console_scripts:propagate',
-    #        'libgs-commspass=libgs.console_scripts:commspass',
-    #        'libgs-schedule=libgs.console_scripts:schedule',
-    #        'libgs-restapi=libgs.console_scripts:restapi',
-    #        'libgs-emulate=libgs.console_scripts:emulate'
-    #    ],
-    #}
+    entry_points={  # Optional
+        'console_scripts': [
+            'libgs-download-tle=libgs.console_scripts:download_tle',
+            'libgs-propagate=libgs.console_scripts:propagate',
+            'libgs-commspass=libgs.console_scripts:commspass',
+            'libgs-schedule=libgs.console_scripts:schedule',
+        ],
+    }
 )
