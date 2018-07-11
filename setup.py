@@ -31,7 +31,7 @@ setup(
     # setup requires are packets required for the setup to 
     # funciton. We are using setuptools_scm to get version numbering
     # from scm tags
-    #setup_requires=['setuptools_scm'],
+    setup_requires=['setuptools_scm'],
 
     # This is the name of your project. The first time you publish this
     # package, this name will be registered for you. It will determine how
@@ -52,8 +52,8 @@ setup(
     # For a discussion on single-sourcing the version across setup.py and the
     # project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    #use_scm_version=True,
-    version='0.1.0',  # Required <-- handled by scm_setuptools
+    use_scm_version=True,
+    #version='0.1.0',  # Required <-- handled by scm_setuptools
 
     # This is a one-line description or tagline of what your project does. This
     # corresponds to the "Summary" metadata field:
