@@ -34,16 +34,19 @@ Created on Tue Jan  2 10:10:48 2018
 """
 
 from xmlrpclib import ServerProxy, Transport
-import json
 
 
 class RPCClient(ServerProxy):
     """
     An improvement on ye olde ServerProxy that
       * Times out if the connection has gone belly up
-      * Allows kwargs to be passed along with arguments by encoding everything as json
+      * Allows kwargs to be passed along with arguments, by adding the kwargs as a single dictionary argument
+        at the end of the list of parameters. If no kwargs are specified it will not be added, and therefore it
+        is fully backwards compatible with normal SimpleXMLRPCServer.
+
     """
-    _JSON_ID = 'XMLRPC+json://'
+    # This flag is added by the client to an argument dictionary to be treated as kwargs
+    _KWARGS_FLAG = '__xmlrpc__kwargs__'
 
     class TimeoutTransport(Transport):
 
@@ -58,41 +61,31 @@ class RPCClient(ServerProxy):
             return connection
 
     def __init__(self, uri, timeout=60, transport=None, encoding=None, verbose=0,
-                 allow_none=0, use_datetime=0, use_kwargs=False):
-        """
-        :param uri:
-        :param timeout:
-        :param transport:
-        :param encoding:
-        :param verbose:
-        :param allow_none:
-        :param use_datetime:
-        :param use_kwargs:    Note, if you set this to True, you will need a kwargs compatible RPCServer at the other end
-        """
+                 allow_none=0, use_datetime=0):
+
         if transport is not None:
             raise Exception("transport parameter is not allowed. This implementation uses a timeout transport")
 
         t = self.TimeoutTransport(timeout)
 
-        self._use_kwargs = use_kwargs
-
         ServerProxy.__init__(self, uri, t, encoding, verbose, allow_none, use_datetime)
 
     def __dir__(self):
-        methods =  self.system.listMethods()
+        methods = self.system.listMethods()
         return [] if methods is None else methods
 
-
-    def _create_jsonenc_method(self, name):
-        def _method(*args, **kwargs):
-            method = ServerProxy.__getattr__(self, name)
-            return method(self._JSON_ID + json.dumps((args, kwargs)))
-
-        return _method
-
     def __getattr__(self, name):
-        if self._use_kwargs: # If we are using kwargs we will encode arguments as a json string
-            return self._create_jsonenc_method(name)
-        else: # If not we just use the normal ServerProxy method
+
+        if name == 'system':
             return ServerProxy.__getattr__(self, name)
 
+        def _method(*args, **kwargs):
+            method = ServerProxy.__getattr__(self, name)
+            if len(kwargs) > 0:
+                kwargs[self._KWARGS_FLAG] = True
+                params = list(args) + [kwargs]
+                return method(*params)
+            else:
+                return method(*args)
+
+        return _method
