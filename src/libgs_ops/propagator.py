@@ -66,10 +66,6 @@ def _print( *arg, **kwarg):
     print(*arg, **kwarg)
 
 
-GS_LAT = -35.291447
-GS_LON = 149.165655
-GS_ELEV = 614
-TRACKED_NORAD_IDS = []
 
 class Error(Exception):
     pass
@@ -198,8 +194,7 @@ class SpaceTrackAPI(object):
 
             Example:
 
-            >>> query_raw('/basicspacedata/query/class/boxscore/
-format/csv')
+            >>> query_raw('/basicspacedata/query/class/boxscore/format/csv')
 
             Will return Space Objects Box Score, part 1 of the Space Situation Report (SSR), in CSV format
 
@@ -527,16 +522,19 @@ class Propagator(object):
             self,
             api = None,
             tles = None,
-            gs_lat=GS_LAT,
-            gs_lon=GS_LON,
-            gs_elev=GS_ELEV,
+            gs_lat = None,
+            gs_lon = None,
+            gs_elev = 0,
             tle_timeout=1,
-            nids=TRACKED_NORAD_IDS
+            nids=[]
             ):
 
         if api is None and tles is None:
             raise Error('You have to specify either uname/pwd or tls')
 
+
+        if gs_lat is None or gs_lon is None:
+            raise Error("gs lon and lat must be specified")
 
         #: Ground station latitude
         self.gs_lat = gs_lat
@@ -571,16 +569,6 @@ class Propagator(object):
             self.api = api
 
             self._update_tles()
-
-
-#            r=requests.post(self.ST_URL+"ajaxauth/login", json={'identity':uname, 'password':pwd})
-#
-#            #
-#            # Raise error if login request fails
-#            #
-#            r.raise_for_status()
-#            self.cookies = r.cookies
-
 
 
 

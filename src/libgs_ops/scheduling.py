@@ -414,6 +414,7 @@ class CommsPass(object):
     def metadata(self):
         return self._metadata
 
+
     def __getattr__(self, key):
         """
         Make it possible to access metadata directly through . operator
@@ -427,10 +428,29 @@ class CommsPass(object):
         """
         Make it possible to access metadata directly through . operator
         """
-        if key in self._metadata.keys():
+        if key in self.metadata.keys():
             self.metadata[key] = val
         else:
             object.__setattr__(self, key, val)
+
+
+    #
+    # Add some helper methods to make the class pickle-able
+    # It doesnt work out of the box because of our fiddling with __getattr__ and __setattr__
+    # So we will make it use by keeping the state as the dict version instead.
+    #
+    def __getstate__(self):
+        return self.to_dict()
+
+    def __setstate__(self, state):
+        object.__setattr__(self, '_metadata', {})
+        cp = CommsPass.from_dict(state)
+        self._metadata = cp._metadata
+        self.pass_data = cp.pass_data
+        self.comms     = cp.comms
+    ########################################################
+
+
 
     def add_communication(self, comm, **kwargs):#comm, retries=3, wait=True):
         """
