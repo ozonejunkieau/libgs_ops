@@ -1007,6 +1007,8 @@ class Propagator(object):
 
         if when is None:
             obs.date = datetime.utcnow().strftime('%Y/%m/%d %H:%M:%S')
+        elif isinstance(when, unicode):
+            obs.date = when.encode()
         else:
             obs.date = when
 
