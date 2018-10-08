@@ -34,7 +34,6 @@ Created on Tue Jan  2 10:10:48 2018
 """
 from __future__ import print_function
 
-import sys
 import requests
 import ephem
 from datetime import datetime
@@ -46,9 +45,6 @@ import numpy as np
 from lxml import html
 import re
 
-
-
-#from utils import Error, Defaults, _print
 
 def _print( *arg, **kwarg):
     """
@@ -83,7 +79,8 @@ except:
 from collections import Iterable
 
 import logging
-log = logging.getLogger('libgs_ops_log')
+log = logging.getLogger('libgs_ops-log')
+log.addHandler(logging.NullHandler())
 
 
 
