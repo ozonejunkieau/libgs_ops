@@ -41,7 +41,7 @@ import ephem
 import os
 from xmlrpclib import ServerProxy
 import logging
-log = logging.getLogger('libgs_ops_log')
+log = logging.getLogger('libgs_ops-log')
 log.addHandler(logging.NullHandler())
 
 
