@@ -39,7 +39,7 @@ import numpy as np
 import json
 import ephem
 import os
-from xmlrpclib import ServerProxy
+from rpc import RPCClient
 import logging
 log = logging.getLogger('libgs_ops-log')
 log.addHandler(logging.NullHandler())
@@ -729,7 +729,7 @@ class RPCSchedulerClient(object):
         self._rpcaddr =  rpcaddr
         self._track_full_pass = track_full_pass
         self._compute_ant_points = compute_ant_points
-        self.server = ServerProxy(self._rpcaddr, allow_none=True)
+        self.server = RPCClient(self._rpcaddr, allow_none=True)
         self._schedule = schedule
 
     @property
