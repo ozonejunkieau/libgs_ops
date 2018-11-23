@@ -594,14 +594,17 @@ class Schedule(object):
                     between two passes
         """
 
-        self.passes = passes[:]
-
         #
         # sorting can be disabled, but there is no obvious reason
         # why you would do that. It may also not be safe
         #
         self.sort_passes = True
         self.buffertime = buffertime
+
+        self.passes = []
+        for p in passes:
+            self.add_pass(p)
+
 
     def __str__(self):
         s =  'Schedule of communication passes:\n'
