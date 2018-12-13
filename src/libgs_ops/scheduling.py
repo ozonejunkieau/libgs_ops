@@ -68,6 +68,20 @@ class Action(dict):
     """
 
     def __init__(self, args, kwargs={}, desc = "unnamed",  retries=0):
+        """
+
+        Args:
+            args:    A list of arguments to pass to the :class:`libgs.protocols.ProtocolBase.do_action` function as positional arguments
+            kwargs:  A dictionary to pass to the :class:`libgs.protocols.ProtocolBase.do_action` function as kwargs.
+            desc:    The description of the action
+            retries: The number of times to retry the action in case of failure.
+
+        .. note::
+
+            It is discouraged to use any positional arguments in the do_action function besides one, which is the
+            action selector. Then use kwargs for anything else. See  :class:`libgs.protocols.ProtocolBase` for additional
+            information on this topic.
+        """
 
         if isinstance(args, list):
             args = tuple(args)
@@ -101,6 +115,13 @@ class Action(dict):
         return self.__str__()
 
     def to_dict(self):
+        """
+        Convert the action to python dictionary format
+
+        Returns:
+            A dictionary
+
+        """
         return dict(self)
 
 class Communication(dict):
@@ -168,6 +189,12 @@ class Communication(dict):
 
 
     def to_dict(self):
+        """
+        Convert the class to a python dictionary format
+        Returns:
+            A dictionary
+
+        """
         # Turn to serialisable dict... we get rid of bytearray entry.
         c = dict(hexstr=self['hexstr'], retries=self['retries'], wait=self['wait'])
         return c
@@ -396,13 +423,6 @@ class CommsPass(object):
         return cmp(self.pass_data.index[0],other.pass_data.index[0])
 
 
-
-#    def get_metadata(self, key):
-#        return self._metadata[key]
-#
-#    def set_metadata(self, key, val):
-#        self._metadata[key] = val
-
     @property
     def metadata(self):
         return self._metadata
@@ -457,7 +477,7 @@ class CommsPass(object):
         Args:
             comm:       The communication to add (either a hex string AB-CD-01-..., or a Communication object or an Action
                         object
-            **kwargs:   Extra arguments passed to :class:Communication constructor in case comm is a hex string.
+            **kwargs:   Extra arguments passed to :class:`Communication` constructor in case comm is a hex string.
 
         Returns:
             None
@@ -492,11 +512,15 @@ class CommsPass(object):
     def plot(self):
         """
         Visualise the pass
+        NOT IMPLEMENTED
         """
         raise Error("Not implemented")
 
 
     def to_dict(self):
+        """
+        Convert class to a python dictionary
+        """
 
         d = dict(
             pass_data = self.pass_data.to_dict(),
@@ -506,12 +530,18 @@ class CommsPass(object):
         return (d)
 
     def copy(self):
+        """
+        Create a copy of the class instance
+        """
         return(CommsPass.from_dict(self.to_dict()))
 
     @classmethod
     def from_dict(self, d):
         """
-        Create CommsPass object from a python dict
+        Classmethod to create CommsPass object from a python dict.
+
+        Usage:
+            >>> cp = CommsPass.from_dict(dict_repr)
 
         Arg:
             d (dict): dictionary
@@ -549,12 +579,18 @@ class CommsPass(object):
         return cpass
 
     def to_json(self):
+        """
+        Convert the class to JSON representation
+        """
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
     @classmethod
     def from_json(self, data):
         """
-        Create CommsPass from a json string or from a json file.
+        Classmethod to Create CommsPass from a json string or from a json file.
+
+        Usage:
+            >>> cp = CommsPass.from_dict(json_repr or json_file)
 
         Arg:
             json (fname or string): json string or file to load
@@ -572,11 +608,13 @@ class CommsPass(object):
 
 
 class Schedule(object):
+    """
+    Class to hold a schedule of passes
+
+    """
 
     def __init__(self, passes=[], buffertime = SCHEDULE_BUFFERTIME):
         """
-            Create a schedule of communication passes.
-
             Args:
                 passes (list(CommsPass)): List of CommsPass objects
                 buffertime (int, optional) : number of seconds to allow, as a minimum
@@ -637,10 +675,20 @@ class Schedule(object):
 
 
     def copy(self):
+        """
+        Create a copy of the Schedule instance
+        """
         return(Schedule.from_dict(self.to_dict()))
 
 
     def add_pass(self, tpass):
+        """
+        Add a pass to the schedule
+
+        Args:
+            tpass: The CommsPass instance to add
+
+        """
 
         # check for overlap. Raises exception if overlap
         self._check_overlap(tpass)
@@ -652,9 +700,23 @@ class Schedule(object):
             self.passes.sort(key=lambda p : p.pass_data.index[0])
 
     def remove_pass(self, tpass):
+        """
+        Remove a CommsPass instance from the schedule
+
+        Args:
+            tpass: The instance to remove
+
+        """
         self.passes.remove(tpass)
 
     def pop_pass(self, index=[]):
+        """
+        Pop the n'th pass from the schedule
+
+        Args:
+            index: The index (or list of indexes) to pop
+
+        """
         self.passes.pop(index)
 
     def _check_overlap(self, tpass):
@@ -664,6 +726,9 @@ class Schedule(object):
 
 
     def to_dict(self):
+        """
+        Convert schedule to its python dictionary representation
+        """
         d = dict(
             passes = [p.to_dict() for p in self.passes],
             sort_passes = self.sort_passes,
@@ -672,13 +737,17 @@ class Schedule(object):
         return(d)
 
     def to_json(self):
+        """
+        Convert schedule to its json  representation
+        """
+
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
 
     @classmethod
     def from_dict(self, d):
         """
-        Create Schedule object from a python dict
+        Classmethod to Create Schedule object from a python dict
 
         Arg:
             d (dict): dictionary
@@ -692,7 +761,7 @@ class Schedule(object):
     @classmethod
     def from_json(self, data):
         """
-        Create Schedule from a json string or from a json file.
+        Classmethod to create Schedule from a json string or from a json file.
 
         Arg:
             json (fname or string): json string or file to load
@@ -711,13 +780,23 @@ class Schedule(object):
 
 class RPCSchedulerClient(object):
     """
-    The RPCSchedulerClient class can replace the scheduler class in remote
-    operations. It connects to the RPCSchedulerClient on the ground station
-    for easy communication and execution of schedules.
+    The RPCSchedulerClient class connects to a remote scheduler and allows basic interaction with it to
+    upload/start/stop schedules.
+
+    For futher information see :class:`libgs.scheduler.Scheduler`
 
     """
 
-    def __init__(self, schedule, track_full_pass=False, compute_ant_points = True, rpcaddr='http://localhost:8000'):
+    def __init__(self, schedule, track_full_pass=True, compute_ant_points = True, rpcaddr='http://localhost:8000'):
+        """
+
+        Args:
+            schedule:           The schedule to execute
+            track_full_pass:    If True (default), a pass will be tracked to its end even when the communications are finished.
+            compute_ant_points: If True (default), libgs will intelligently decide when to move the antenna based on its beamwidth.
+                                Otherwise the schedule will be followed slavishly.
+            rpcaddr:            The XMLRPC address of the remote. For example: http://some.address.com:8000
+        """
         self._rpcaddr =  rpcaddr
         self._track_full_pass = track_full_pass
         self._compute_ant_points = compute_ant_points
@@ -726,14 +805,41 @@ class RPCSchedulerClient(object):
 
     @property
     def state(self):
+        """
+        Get current scheduler state from remote
+        """
         return self.server.scheduler_state()
 
 
     def execute(self, N=None):
+        """
+        Execute the schedule on the remote
+
+        Args:
+            N (optional) : Only execute at most N entries
+
+        """
+
         self.server.execute_schedule(self._schedule.to_json(), self._track_full_pass, self._compute_ant_points, N)
 
     def stop(self):
+        """
+        Stop the scheduler on the remote
+        """
         self.server.stop_schedule()
+
+    def enable(self):
+        """
+        Re-enable a disabled scheduler on the remote
+        """
+        self.server.enable()
+
+    def disable(self):
+        """
+        Disable a scheduler on the remote. It will not be possible to send it schedules or execute schedules before
+        it is re-enabled.
+        """
+        self.server.disable()
 
 
 
