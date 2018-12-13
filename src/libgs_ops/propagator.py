@@ -1,36 +1,40 @@
 # -*- coding: utf-8 -*-
 """
-Copyright © 2017-2018 The University of New South Wales
+..
+    Copyright © 2017-2018 The University of New South Wales
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
-Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
+    Permission is hereby granted, free of charge, to any person obtaining a copy of
+    this software and associated documentation files (the "Software"), to deal in
+    the Software without restriction, including without limitation the rights to use,
+    copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+    Software, and to permit persons to whom the Software is furnished to do so,
+    subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Except as contained in this notice, the name or trademarks of a copyright holder
+    Except as contained in this notice, the name or trademarks of a copyright holder
 
-shall not be used in advertising or otherwise to promote the sale, use or other
-dealings in this Software without prior written authorization of the copyright
-holder.
+    shall not be used in advertising or otherwise to promote the sale, use or other
+    dealings in this Software without prior written authorization of the copyright
+    holder.
 
-UNSW is a trademark of The University of New South Wales.
+    UNSW is a trademark of The University of New South Wales.
 
 
-Created on Tue Jan  2 10:10:48 2018
+libgs_ops.propagator
+=====================
 
-@author: kjetil
+:date:   Jan  2 10:10:48 2018
+:author: Kjetil Wormnes
+
 """
 from __future__ import print_function
 
@@ -52,7 +56,7 @@ def _print( *arg, **kwarg):
 
         This wrapper funciton is provided to allow for more easy redirection
         of output to other destinations (including Bokeh GUI, or files) if
-        necessary.
+        necessary in the futrue.
 
         It should be used for information targeted at an interactive user, not
         for logging messages
@@ -81,7 +85,7 @@ log.addHandler(logging.NullHandler())
 
 
 # Decorator to more easily tag matplotlib functions
-def mpl(func):
+def _mpl(func):
 
     def wrapper(*args, **kwargs):
         if not _HAS_MATPLOTLIB:
@@ -112,10 +116,21 @@ def _tstamp_array(start, end, dt=None):
 
 
 
-
-
-@mpl
+@_mpl
 def mpl_plot_pass(angs, vishor=10):
+    """
+    A helper function to plot a pass in polar coordinates.
+
+    This function requires matplotlib to be installed.
+
+    Args:
+        angs:       The antenna angles (pandas dataframe with az+el columns)
+        vishor:     The horizon (deg)
+
+    Returns:
+        None
+
+    """
 
     angs = angs[angs.el>vishor]
 
@@ -169,6 +184,10 @@ class SpaceTrackAPI(object):
     ST_URL='https://www.space-track.org'
 
     def __init__(self, uname, pwd):
+        """
+        :param uname:
+        :param pwd:
+        """
         r=requests.post(self.ST_URL+"/ajaxauth/login", json={'identity':uname, 'password':pwd})
 
         #

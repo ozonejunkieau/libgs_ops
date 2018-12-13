@@ -1,36 +1,41 @@
 # -*- coding: utf-8 -*-
 """
-Copyright © 2017-2018 The University of New South Wales
+..
+    Copyright © 2017-2018 The University of New South Wales
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
-Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
+    Permission is hereby granted, free of charge, to any person obtaining a copy of
+    this software and associated documentation files (the "Software"), to deal in
+    the Software without restriction, including without limitation the rights to use,
+    copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+    Software, and to permit persons to whom the Software is furnished to do so,
+    subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Except as contained in this notice, the name or trademarks of a copyright holder
+    Except as contained in this notice, the name or trademarks of a copyright holder
 
-shall not be used in advertising or otherwise to promote the sale, use or other
-dealings in this Software without prior written authorization of the copyright
-holder.
+    shall not be used in advertising or otherwise to promote the sale, use or other
+    dealings in this Software without prior written authorization of the copyright
+    holder.
 
-UNSW is a trademark of The University of New South Wales.
+    UNSW is a trademark of The University of New South Wales.
 
 
-Created on Sun Aug  6 17:36:19 2017
+libgs_ops.scheduling
+=====================
 
-@author: kjetil
+:date: Sun Aug  6 17:36:19 2017
+:author: kjetil
+
+
 """
 
 import pandas as pd
@@ -45,24 +50,12 @@ log = logging.getLogger('libgs_ops-log')
 log.addHandler(logging.NullHandler())
 
 
-##########
-#Extract from utils
-###
-def bytes2hex(data):
-    data =bytearray(data)
-    return('-'.join(["%02X"%(x) for x in data]))
-
-
-def hex2bytes(hexstr):
-    data = hexstr.split('-')
-    return bytearray(''.join([chr(int(x, 16)) for x in data]))
 
 class Error(Exception):
     pass
 
 SCHEDULE_BUFFERTIME = 180
 
-############
 
 
 class Action(dict):
@@ -136,10 +129,10 @@ class Communication(dict):
 
         if isinstance(cmd, basestring):
             self._check_cmdstr(cmd)
-            barray = hex2bytes(cmd)
             hexstr = cmd
+            barray = bytearray([int(x, 16) for x in bytes.split('-')])
         elif isinstance(cmd, bytearray):
-            hexstr = bytes2hex(cmd)
+            hexstr = '-'.join(["%02X"%(x) for x in cmd])
             barray = cmd
         elif isinstance(cmd, Communication):
             hexstr = cmd['hexstr']
@@ -452,7 +445,7 @@ class CommsPass(object):
 
 
 
-    def add_communication(self, comm, **kwargs):#comm, retries=3, wait=True):
+    def add_communication(self, comm, **kwargs):
         """
             Add a communication to the pass. The communication can be supplied
             either as a string of HEX-pairs, as a bytearray, or as a Communications
@@ -460,6 +453,14 @@ class CommsPass(object):
 
             If a HEX string or a bytearray is supplied, it will be converted to a
             Communication object internally
+
+        Args:
+            comm:       The communication to add (either a hex string AB-CD-01-..., or a Communication object or an Action
+                        object
+            **kwargs:   Extra arguments passed to :class:Communication constructor in case comm is a hex string.
+
+        Returns:
+            None
 
         """
 
@@ -477,19 +478,7 @@ class CommsPass(object):
 
 
         elif isinstance(comm, basestring) or isinstance(comm, bytearray):
-
-            if 'retries' in kwargs.keys():
-                retries = kwargs['retries']
-            else:
-                retries = 3
-
-
-            if 'wait' in kwargs.keys():
-                wait = kwargs['wait']
-            else:
-                wait = True
-
-            self.comms.append(Communication(comm, retries, wait))
+            self.comms.append(Communication(comm, **kwargs))
         else:
             raise Error("Invalid type for comms object: %s"%(type(comm)))
 
