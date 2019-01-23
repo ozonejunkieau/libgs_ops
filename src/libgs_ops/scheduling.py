@@ -58,7 +58,7 @@ Communication Pass:
 
 .. note::
     The :class:`CommsPass` allows you to set arbitrary metadata. Such metadata will be stored in the pass database together with the schedule. 
-    It may also be used by a custom protocol that requires it. (See :class:`libgs.protocols.ProtocolBase`) 
+    It may also be used by a custom protocol that requires it. (See :class:`libgs.protocols.protocolbase.ProtocolBase`) 
     The metadata can be seen in the :attr:`CommsPass.metadata` attribute. It is also directly accessible by the . operator, but 
     the . operator can *not* be used to create new metadata. Either add it to the metadata dict, or on :class:`CommsPass` construction as 
     in the example below.   
@@ -94,7 +94,7 @@ Communication Pass:
      2 ( 3 retries) : AA-AB-EA-2B-17-2D
 
 The scheduler also supports actions. :class:`Action` s refer to any functionality you may have implemented in the protocol's 
-:meth:`libgs.protocols.ProtocolBase.do_action` method,  and there is no standard format since the syntax depends on the function. 
+:meth:`libgs.protocols.protocolbase.ProtocolBase.do_action` method,  and there is no standard format since the syntax depends on the function. 
 Assuming you have made some actions for starting and stopping comms, you could add them with something like this:
 
 >>> cp.add_communication(Action(("start_comms", 3), {'some_kwarg': 2}, desc="Start communication", retries=5))
@@ -114,7 +114,7 @@ Communication Pass:
      4 ( 0 retries) : 'unnamed' <('stop_comms',), {}>
 
 In general it is recommended to only use one positional argument, (first tuple in :meth:`CommsPass.add_communication`) and keep action-specific parameters in the dictionary (second tuple).
-But this is not a requirement. See :meth:`libgs.protocolbase.ProtocolBase.do_action`.
+But this is not a requirement. See :meth:`libgs.protocols.protocolbase.ProtocolBase.do_action`.
 
 You can access the pass data in the commspass directly. This is exatly the same pdat structure you passed in on creation:
 
@@ -199,10 +199,10 @@ appropriate - other headings do not matter):
 There are two main ways of executing the schedule on the groundstation depending on how you have implemented it.
 
     1. You can start your software (and scheduler) by loading and running the schedule file.
-    2. You can start your software by starting the :class:`libgs.rpc.RPCSchedulerClient`. You will then be able to send
-       the schedule to the groundstation with a simple XMLRPC call.
+    2. You can start your software by starting the :class:`libgs.rpc.RPCSchedulerServer`. You will then be able to send
+       the schedule to the groundstation with a simple XMLRPC call via :class:`RPCSchedulerClient`.
 
-If :class:`libgs.rpc.RPCSchedulerClient` is running on the target ground station, you can upload a schedule as follows:
+If :class:`libgs.rpc.RPCSchedulerServer` is running on the target ground station, you can upload a schedule as follows:
 
 >>> sch = RPCSchedulerClient(schedule=s, rpcaddr='http://xmlrpc/address/goes/here')
 
@@ -265,15 +265,15 @@ class Action(dict):
         """
 
         Args:
-            args:    A list of arguments to pass to the :class:`libgs.protocols.ProtocolBase.do_action` function as positional arguments
-            kwargs:  A dictionary to pass to the :class:`libgs.protocols.ProtocolBase.do_action` function as kwargs.
+            args:    A list of arguments to pass to the :class:`libgs.protocols.protocolbase.ProtocolBase.do_action` function as positional arguments
+            kwargs:  A dictionary to pass to the :class:`libgs.protocols.protocolbase.ProtocolBase.do_action` function as kwargs.
             desc:    The description of the action
             retries: The number of times to retry the action in case of failure.
 
         .. note::
 
             It is discouraged to use any positional arguments in the do_action function besides one, which is the
-            action selector. Then use kwargs for anything else. See  :class:`libgs.protocols.ProtocolBase` for additional
+            action selector. Then use kwargs for anything else. See  :class:`libgs.protocols.protocolbase.ProtocolBase` for additional
             information on this topic.
         """
 

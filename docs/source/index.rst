@@ -37,6 +37,13 @@ libgs-ops is fairly light on requirements and should be possible to run on any r
    python3 support is planned and should not pose any great difficulty to implement. It has however not been prioritised up to
    this point as no users have expressed strong need for it.
 
+.. warning::
+
+   If you are reading this on readthedocs, the documentation is most likely broken.
+   So until I succeed in getting it to play nice with RTD (i.e. until further notice), it will be hosted
+   on github pages and you can access it at the following address:
+
+   https://kworm1.github.io/libgs_ops-docs/
 
 
 API reference by module
