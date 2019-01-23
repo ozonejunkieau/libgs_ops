@@ -201,7 +201,8 @@ intersphinx_mapping = {
     'sqlalchemy': ('https://docs.sqlalchemy.org/en/latest/', None),
     'numpy': ('https://docs.scipy.org/doc/numpy/', None),
     'pandas': ('https://pandas.pydata.org/pandas-docs/stable', None),
-    'bokeh': ('https://bokeh.pydata.org/en/latest/', None)
+    'bokeh': ('https://bokeh.pydata.org/en/latest/', None),
+    'libgs': ('https://kworm1.github.io/libgs-docs/', None)
     }
 
 # -- Options for todo extension ----------------------------------------------

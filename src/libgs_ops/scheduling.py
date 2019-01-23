@@ -35,7 +35,201 @@ libgs_ops.scheduling
 :date: Sun Aug  6 17:36:19 2017
 :author: kjetil
 
+Usage
+-----
 
+.. note::
+    This example focues on the scheduler. Please see :mod:`.propagator` for instructions on how to compute
+    pass data (az, el and range_rate) for your pass. For the remainder of these tutorials it is assumed
+    that pdat exists.
+
+First the pass data must be converted into a :class:`CommsPass`:
+
+>>> cp = CommsPass(pdat, desc="Test pass")
+>>> cp
+Communication Pass:
+  Norad ID:       25544
+  Description:    Test pass
+  Visib. horizon: 10
+  Pass start:     2017/10/13 13:57:16
+  Pass end:       2017/10/13 14:03:58
+  Scheduled comms:
+   (no comms added but NOT listen mode)
+
+.. note::
+    The :class:`CommsPass` allows you to set arbitrary metadata. Such metadata will be stored in the pass database together with the schedule. 
+    It may also be used by a custom protocol that requires it. (See :class:`libgs.protocols.ProtocolBase`) 
+    The metadata can be seen in the :attr:`CommsPass.metadata` attribute. It is also directly accessible by the . operator, but 
+    the . operator can *not* be used to create new metadata. Either add it to the metadata dict, or on :class:`CommsPass` construction as 
+    in the example below.   
+
+>>> cp = CommsPass(pdat, hello=123, test=[1,2,3], another=dict(a=1,b=2))
+>>> cp.metadata
+{'another': {'a': 1, 'b': 2},
+ 'desc': None,
+ 'hello': 123,
+ 'horizon': 10.0,
+ 'listen': False,
+ 'nid': 25544,
+ 'test': [1, 2, 3]}
+>>> cp.test
+[1, 2, 3]
+
+Then add communications to the pass. There are several ways to specify the byte sequence of the communications. You can also set
+the ``retries`` parameter that specifies how many times to try again in case of failure.
+
+>>> cp.add_communication('DC-00-34-BB-AA')
+>>> cp.add_communication('AA-BB-CC-DD', retries=1)
+>>> cp.add_communication(bytearray([0xaa,0xab, 234,43,23,45]))
+>>> cp
+Communication Pass:
+  Norad ID:       25544
+  Description:    None
+  Visib. horizon: 10
+  Pass start:     2017/10/13 13:57:16
+  Pass end:       2017/10/13 14:03:58
+  Scheduled comms:
+     0 ( 3 retries) : DC-00-34-BB-AA
+     1 ( 1 retries) : AA-BB-CC-DD
+     2 ( 3 retries) : AA-AB-EA-2B-17-2D
+
+The scheduler also supports actions. :class:`Action` s refer to any functionality you may have implemented in the protocol's 
+:meth:`libgs.protocols.ProtocolBase.do_action` method,  and there is no standard format since the syntax depends on the function. 
+Assuming you have made some actions for starting and stopping comms, you could add them with something like this:
+
+>>> cp.add_communication(Action(("start_comms", 3), {'some_kwarg': 2}, desc="Start communication", retries=5))
+>>> cp.add_communication(Action(("stop_comms",)))
+>>> cp
+Communication Pass:
+  Norad ID:       25544
+  Description:    None
+  Visib. horizon: 10
+  Pass start:     2017/10/13 13:57:16
+  Pass end:       2017/10/13 14:03:58
+  Scheduled comms:
+     0 ( 3 retries) : DC-00-34-BB-AA
+     1 ( 1 retries) : AA-BB-CC-DD
+     2 ( 3 retries) : AA-AB-EA-2B-17-2D
+     3 ( 5 retries) : 'Start communication' <('start_comms', 3), {'some_kwarg': 2}>
+     4 ( 0 retries) : 'unnamed' <('stop_comms',), {}>
+
+In general it is recommended to only use one positional argument, (first tuple in :meth:`CommsPass.add_communication`) and keep action-specific parameters in the dictionary (second tuple).
+But this is not a requirement. See :meth:`libgs.protocolbase.ProtocolBase.do_action`.
+
+You can access the pass data in the commspass directly. This is exatly the same pdat structure you passed in on creation:
+
+>>> cp.pass_data.head()
+
+=============== ======================= =========== =========== ============
+.                tstamp_str              az          el          range_rate
+=============== ======================= =========== =========== ============
+43020.081435     2017/10/13 13:57:16     314.109     10.0034     -6800.68
+43020.081447     2017/10/13 13:57:17     314.111     10.1116     -6798.35
+43020.081458     2017/10/13 13:57:18     314.113     10.2206     -6795.98
+43020.081470     2017/10/13 13:57:19     314.115     10.3303     -6793.57
+43020.081481     2017/10/13 13:57:20     314.117     10.4407     -6791.12
+=============== ======================= =========== =========== ============
+
+To make a schedule, you need to add :class:`CommsPass`'es to a :class:`Schedule`:
+
+>>> s = Schedule()
+>>> s.add_pass(cp)
+>>> s
+---- -------- -------------------- -------------------- --------------
+#    Norad id Pass start (utc)     Pass end (utc)       Communications
+---- -------- -------------------- -------------------- --------------
+0    25544    2017/10/13 13:57:16  2017/10/13 14:03:58  5
+
+The schedule does not permit you to add overlapping passes:
+
+>>> s.add_pass(cp)
+Error: Can't add pass as it overlaps with another pass in the schedule
+
+It is often useful to dump the schedule to a file that can be shared with other operators or loaded into adfa-gs. 
+To dump a schedule to file in JSON format use the to_json() method:
+
+>>> with open('test.schedule', 'w') as fp:
+>>>    fp.write(s.to_json())
+
+To load it again, use from_json classmethod:
+
+>>> s2 = Schedule.from_json('test.schedule')
+
+The :class:`Schedule` provides several convenience functions. Check the help for details.
+
+The below complete example adds schedules for several upcoming passes, all with the same communication, and with an extra communication
+to the final:
+
+>>> passes = p.get_passes(25544, N=10, when='2017/10/14', horizon=10)
+>>> cps = []
+>>> for k,satpass in passes.iterrows():
+>>>    pdat, psum = p.compute_pass(satpass.nid, when=satpass.rise_t)
+>>>    cps += [CommsPass(pdat)]
+>>>    cps[-1].add_communication(bytearray([1,2,3,4]))
+>>> s = Schedule(cps)    
+>>> s.passes[-1].add_communication('AA-BB-CC-DD')
+>>> s
+---- -------- -------------------- -------------------- --------------
+#    Norad id Pass start (utc)     Pass end (utc)       Communications
+---- -------- -------------------- -------------------- --------------
+0 	25544 	2017/10/14 13:05:17 	2017/10/14 13:11:33 	1
+1 	25544 	2017/10/14 14:42:23 	2017/10/14 14:47:36 	1
+2 	25544 	2017/10/14 19:36:11 	2017/10/14 19:40:33 	1
+3 	25544 	2017/10/14 21:11:50 	2017/10/14 21:18:22 	1
+4 	25544 	2017/10/15 12:13:52 	2017/10/15 12:18:42 	1
+5 	25544 	2017/10/15 13:49:28 	2017/10/15 13:55:42 	1
+6 	25544 	2017/10/15 18:44:54 	2017/10/15 18:46:44 	1
+7 	25544 	2017/10/15 20:19:33 	2017/10/15 20:26:08 	1
+8 	25544 	2017/10/15 21:58:46 	2017/10/15 21:59:03 	1
+9 	25544 	2017/10/16 12:56:54 	2017/10/16 13:03:35 	2
+
+
+In some situations you may want to manually calculate the pointings of the antenna, or the schedule. 
+If so, just ensure you create a pdat in the correct format (i.e. with tstamp_str, az, el, range_rate as 
+appropriate - other headings do not matter):
+
+>>> pdat = pd.read_excel('passes_test.xlsx')
+>>> cp = CommsPass(pdat, nid=-1)
+
+.. note::
+   When specifying the pass data this way you will need  to specify which Norad ID the schedule is associated with since the 
+   excel file did not specify it. It does not have to be a valid NID, so if this was a testing pass we could for example set it to -1
+
+
+There are two main ways of executing the schedule on the groundstation depending on how you have implemented it.
+
+    1. You can start your software (and scheduler) by loading and running the schedule file.
+    2. You can start your software by starting the :class:`libgs.rpc.RPCSchedulerClient`. You will then be able to send
+       the schedule to the groundstation with a simple XMLRPC call.
+
+If :class:`libgs.rpc.RPCSchedulerClient` is running on the target ground station, you can upload a schedule as follows:
+
+>>> sch = RPCSchedulerClient(schedule=s, rpcaddr='http://xmlrpc/address/goes/here')
+
+.. note::
+   The syntax for rpcaddr is http(s)://<uname>:<passwd>@<host>:<port>/...
+   So if basic authentication has been enabled, or the rpc runs on an unsual port you can adjust as required
+
+:class:`RPCSchedulerClient` implements all the methods of the :class:`libgs.scheduler.Scheduler` so you can use it the same way:
+
+To start:
+
+>>> sch.execute()
+
+To stop (abort) a running schedule:
+
+>>> sch.stop()
+
+The scheduler implements two flags; track_full_pass and compute_ant_points. If the former has been set to true, 
+the antenna will keep tracking even after finishing its communications. 
+If the latter has been set to false, the antenna will stupidly execute every line in the schedule. 
+This is a really bad idea for automatically computed passes but you will probably want to use it if you are 
+pointing the antenna in a fixed direction for testing:
+
+>>> sch = RPCSchedulerClient(schedule=s, rpcaddr='http://rpc.mygroundstation.com:8000', track_full_pass=True, compute_ant_points=False)
+
+Module Reference
+----------------
 """
 
 import pandas as pd
