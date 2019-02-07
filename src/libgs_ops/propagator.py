@@ -218,6 +218,7 @@ from pandas import DataFrame
 import numpy as np
 from lxml import html
 import re
+from functools import wraps
 
 
 def _print( *arg, **kwarg):
@@ -238,6 +239,7 @@ def _print( *arg, **kwarg):
 
 
 class Error(Exception):
+    """ A generic exception """
     pass
 
 try:
@@ -257,6 +259,7 @@ log.addHandler(logging.NullHandler())
 # Decorator to more easily tag matplotlib functions
 def _mpl(func):
 
+    @wraps(func)
     def wrapper(*args, **kwargs):
         if not _HAS_MATPLOTLIB:
             raise Error("matplotib.pyplot not available, before using this funciton you need to install it : pip install matplotlib")
@@ -348,15 +351,21 @@ def mpl_plot_pass(angs, vishor=10):
 
 class SpaceTrackAPI(object):
     """
-        Class to interface with space-track.org
+        Class to interface with `space-track.org <https://www.space-track.org>`_.
+
+        This class connects to the space-track.org public API, and therefore requires a username and password. 
+        To obtain such credentials you can register for free on the space-track website.
+
+        This class allows the execution of arbitrary API queries, but provides a simplified method to download TLEs in
+        the format used by :class:`.Propagator`.
     """
 
     ST_URL='https://www.space-track.org'
 
     def __init__(self, uname, pwd):
         """
-        :param uname:
-        :param pwd:
+        :param uname: space-track.org user name
+        :param pwd: space-track.org password
         """
         r=requests.post(self.ST_URL+"/ajaxauth/login", json={'identity':uname, 'password':pwd})
 
@@ -371,7 +380,7 @@ class SpaceTrackAPI(object):
             Perform a raw query to spacetrack API. Can return anything the API
             can.
 
-            See `spacetrack <https://www.space-track.org/documentation#/api>`
+            See `spacetrack <https://www.space-track.org/documentation#/api>`_
             for the URI syntax.
 
             Args:
@@ -512,7 +521,22 @@ class SpaceTrackAPI(object):
 
     def get_tle_sets(self, name):
         """
-            A shortcut to some predefined sets of satellites
+            A shortcut to some predefined sets of satellites. 
+            
+            Avaliable sets are:
+
+            ============== ============================================================
+            'amateur_all'  space-track.org curated list of amateur radio satellites
+            'leo_all'      All satellites in LEO (period < 128 )
+            'geo_all'      All satellites in GEO (period between 1430 and 1450)
+            ============== ============================================================
+
+            Args:
+                name (str): The set to get (see above)
+
+            Returns:
+                Concatenated string of TLEs
+
         """
 
         if name == "amateur_all":
@@ -537,18 +561,19 @@ class SpaceTrackAPI(object):
     def get_tles(self, nids):
         """
             Query space-track for a series of norad IDs, and return
-            the NIDs and TLEs in a dict
+            the NIDs and TLEs in a dict.
+
+            .. note:: 
+                In some cases space-track can not find a TLE. **No error**
+                will be raised by this function and it is up to the caller
+                to check whether the returned NIDs match the passed ones.
 
             Args:
                 nids (list(int)): List of norad ids to query for
 
+            Returns:
+                Python dictionary of NIDS/TLES
 
-            Returns::
-                Dictionary of TLEs
-
-            .. note:: In some cases space-track can not find a TLE. No error
-                will be raised by this function and it is up to the caller
-                to check whether the returned NIDs match the passed ones.
 
         """
         idstr=",".join(str(x) for x in nids)
@@ -573,14 +598,20 @@ class TLEDb(object):
 
         The Database can be loaded from a file, or input directly.
 
-        This class can serve as a drop-in replacement for the SpaceTrackAPI class
-        in the propagator as it implements the get_tles method.
+        This class can serve as a drop-in replacement for :class:`.SpaceTrackAPI`
+        when creating a :class:`.Propagator` as it implements the ``get_tles`` method.
 
-        .. todo::
-            implement saving in binary format that is faster.
     """
 
     def __init__(self, fname=None, tles=None):
+        """
+        .. note::
+            Only one of the arguments (fname or tles) must be specified, and not both.
+
+        Args:
+            fname (str): The filename to load TLEs from
+            tles (dict or str): Manual specificaiton of TLES
+        """
         if (fname is not None) and (tles is not None):
             raise Error("only enter fname OR tles")
 
@@ -611,6 +642,14 @@ class TLEDb(object):
 
 
     def save_tles(self, fname, fformat='txt'):
+        """
+            Save the database to file.
+
+            Args:
+                fname (str): Filename to save to
+                fformat (str): Currently has to be 'txt'
+
+        """
 
         if fformat == 'txt':
             fp = open(fname, 'w')
@@ -618,8 +657,10 @@ class TLEDb(object):
             fp.write(tlestr)
             fp.close()
 
-        elif format == 'pickle':
+        elif fformat == 'pickle':
             pass
+        else:
+            raise Exception('Invalid file format {}'.format(fformat))
 
 
 
@@ -653,11 +694,20 @@ class TLEDb(object):
 
     def get_tles(self, nids):
         """
+            Query database for a series of norad IDs, and return
+            the NIDs and TLEs in a dict.
+
+            .. note:: 
+                If the NID is not in the database, **no error**
+                will be raised by this function and it is up to the caller
+                to check whether the returned NIDs match the passed ones.
+
             Args:
                 nids (list(int)): List of Norad IDs
 
-            Return:
-                TLEs
+            Returns:   
+                Python dictionary of NIDS/TLES
+
         """
 
         tles = dict()
@@ -672,32 +722,14 @@ class Propagator(object):
 
     Class to compute pointing angles for a satellite based on its Norad ID
 
-    Args:
-        api                             : API for TLE updates
-        tles (str)                      : TLEstring
-        gs_lat (:obj:`float`, optional) : latitude of ground station
-        gs_lon (float, optional)        : longitude of ground station
-        gs_elev (float, optional)       : elevation of ground station
-        tle_timeout (float, optional)   : Time in days before re-requesting new TLEs
-        nids (list(int), optional)      : List of NORAD IDs to track.
-            If a satellite is requested that is not in this list it will be
-            added and a full refresh of the TLEs from space-track initiated.
+    You can connect to a local Db using the TLEDb class, to spacetrack
+    using the SpaceTrackAPI class, or simply just specify the TLEs
+    directly as a string. The latter will use the manually input tles and never query space-track.
 
-    .. warning::
-        You can connect to a local Db using the TLEDb class, to spacetrack
-        using the SpaceTrackAPI class, or simply just specify the TLEs
-        directly as a string. The latter will use the manually input tles and never query space-track.
+    For a reference on TLEs see `Wikipedia <https://en.wikipedia.org/wiki/Two-line_element_set>`_
 
     .. note::
-        For a reference on TLEs see `Wikipedia <https://en.wikipedia.org/wiki/Two-line_element_set>`
-
-    .. note::
-        This class relies heavily on `py-ephem <http://rhodesmill.org/pyephem/>`
-
-    .. todo::
-        Get rid of the manual entry of TLE string. Itś depricated
-        with the TLEDb class.
-
+        This class relies heavily on `py-ephem <http://rhodesmill.org/pyephem/>`_
 
     """
 
@@ -714,6 +746,18 @@ class Propagator(object):
             tle_timeout=1,
             nids=[]
             ):
+        """
+        Args:
+            api                             : API for TLE updates
+            tles (str)                      : TLEstring
+            gs_lat (float, optional)        : latitude of ground station
+            gs_lon (float, optional)        : longitude of ground station
+            gs_elev (float, optional)       : elevation of ground station
+            tle_timeout (float, optional)   : Time in days before re-requesting new TLEs
+            nids (list(int), optional)      : List of NORAD IDs to track.
+                If a satellite is requested that is not in this list it will be
+                added and a full refresh of the TLEs from space-track initiated.
+        """
 
         if api is None and tles is None:
             raise Error('You have to specify either uname/pwd or tls')

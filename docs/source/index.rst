@@ -43,7 +43,7 @@ libgs-ops is fairly light on requirements and should be possible to run on any r
    So until I succeed in getting it to play nice with RTD (i.e. until further notice), it will be hosted
    on github pages and you can access it at the following address:
 
-   https://kworm1.github.io/libgs_ops-docs/
+   https://kworm1.github.io/libgs-docs/
 
 
 API reference by module

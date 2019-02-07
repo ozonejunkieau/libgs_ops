@@ -246,8 +246,10 @@ log.addHandler(logging.NullHandler())
 
 
 class Error(Exception):
+    """ Generic Exception """
     pass
 
+#: Default buffertime
 SCHEDULE_BUFFERTIME = 180
 
 
@@ -265,10 +267,12 @@ class Action(dict):
         """
 
         Args:
-            args:    A list of arguments to pass to the :class:`libgs.protocols.protocolbase.ProtocolBase.do_action` function as positional arguments
-            kwargs:  A dictionary to pass to the :class:`libgs.protocols.protocolbase.ProtocolBase.do_action` function as kwargs.
-            desc:    The description of the action
-            retries: The number of times to retry the action in case of failure.
+            args (list or tuple):       A list of arguments to pass to the protocol's 
+                :meth:`~libgs.protocols.protocolbase.ProtocolBase.do_action` method as positional arguments
+            kwargs (dict):              A dictionary to pass to the protocol's 
+                :meth:`~libgs.protocols.protocolbase.ProtocolBase.do_action` method as kwargs.
+            desc (str(optional)):       The description of the action
+            retries (int(optional)):    The number of times to retry the action in case of failure.
 
         .. note::
 
@@ -326,6 +330,14 @@ class Communication(dict):
     It is just a convenience class that wraps and populates a dictionary
     properly for use by the other classes in this module.
 
+    It can be constructed with either a HEX string or a bytearray and will automatically compute the other. After construction
+    it will be a dictionary with the following fields:
+
+      * hexstr: Hex representation of byte stream
+      * barray: :class:`bytearray` represenation of bytestream
+      * retries: Number of retries
+      * wait:    Whether to wait for reply
+
 
     """
 
@@ -333,12 +345,9 @@ class Communication(dict):
         """
 
         Args:
-            cmd (string or bytearray): Command string (fully encoded) to send
-            to satellite.
-            retries (int): Number of times the command should be retried in
-            case of failure
-            wait (bool): Whether the ground station should wait for a reply
-            from the satellite or not.
+            cmd (basestring or bytearray): Command string (fully encoded) to send to satellite.
+            retries (int): Number of times the command should be retried in case of failure
+            wait (bool): Whether the ground station should wait for a reply from the satellite or not.
 
         """
 
@@ -384,9 +393,10 @@ class Communication(dict):
 
     def to_dict(self):
         """
-        Convert the class to a python dictionary format
+        Convert the class to a serialisable python dictionary format (gets rid of the bytearray entry).
+
         Returns:
-            A dictionary
+            A serialisable dictionary
 
         """
         # Turn to serialisable dict... we get rid of bytearray entry.
@@ -398,7 +408,12 @@ class Communication(dict):
 
 class CommsPass(object):
     """
-    Class to hold a communications pass
+    Class to hold a communications pass.
+
+    A CommsPass is defined as a pass data (az, el, range_rate) schedule with associated set of :class:`communications <.Communication>` 
+    and :class:`actions <.Action>`.
+
+    Arbitrary metadata (must be picklable) can also be added to the object.
 
     """
 
@@ -406,15 +421,15 @@ class CommsPass(object):
 
     def __init__(self, pass_data, desc=None, nid=None, horizon=0, comms=[], listen=False, **kwargs):
         """
-        Args;
-            pass_data (): Pandas DataFrame with at least az, el, range_rate columns
-            nid (int)   : Norad ID to associate with pass. Can be left empty if pass_data has a .nid field.
-            horizon (float): The lowest acceptable elevation for the pass. Pass_data will be cropped to the horizon
-            comms (list, optional) : List of communications (can be added with add_communications instead)
-            listen (bool, optional): Whether it is a listen pass or not
-            tle (str, optional)    : The TLE used for computing pass_data
+        Args:
+            pass_data (:class:`~pandas.DataFrame`): Dataframe with at least az, el, range_rate columns
+            nid (int)               : Norad ID to associate with pass. Can be left empty if pass_data has a .nid field.
+            horizon (float)         : The lowest acceptable elevation for the pass. Pass_data will be cropped to the horizon
+            comms (list, optional)  : List of communications (can be added with add_communications instead)
+            listen (bool, optional) : Whether it is a listen pass or not
+            tle (str, optional)     : The TLE used for computing pass_data
             protocol (str, optional): The protocol to use during the pass
-            **kwargs: Any other key=value pair to pass to scheduler to be logged
+            **kwargs                : Any other key=value pair to pass to scheduler to be logged (added to the metadata)
 
         """
         # NOTE: Internally, picklable arguments (i.e. everything except pass_data and comms) are
@@ -496,14 +511,27 @@ class CommsPass(object):
         self.metadata.update(kwargs)
 
 
-
-
-
+    # This private method is included for backwards compatability only.
     def _change_time(self, tstamp):
-        """
-        Debugging function: Adjusts the timestamp as required
-        If you run this it will not correspond to a real satellite anymore
+        self.change_time(tstamp)
 
+
+    def change_time(self, tstamp):
+
+        """
+        Modify the pass data start time.
+
+        If you run this the pass will not correspond to a real satellite pass anymore, but it is an extremely useful function when
+        testing an upcoming pass in a dry-run.
+
+        Example:
+
+        >>> cp.change_time('2019-11-01 12:32:42')
+
+        Will modify the commspass pass data so that it starts at ``2019-11-01 12:32:42``. Everything else stays the same.
+
+        Args:
+            tstamp: New timestamp (in any format supported by :class:`ephem.Date`, for example ISO string, or a python :class:`datetime.datetime`)
         """
         curt =  self.pass_data.index[0]
         newt = ephem.Date(tstamp)
@@ -596,8 +624,8 @@ class CommsPass(object):
         defined buffertime of the current pass finishing.
 
         Args:
-            other (CommsPass): The pass to compare with
-            buffertime (float): The time in seconds to allow as a minimum between passes
+            other (:class:`.CommsPass`): The pass to compare with
+            buffertime (float):         The time in seconds to allow as a minimum between passes
 
         """
         rt0 = pd.to_datetime(self.pass_data.iloc[0].tstamp_str)
@@ -619,6 +647,9 @@ class CommsPass(object):
 
     @property
     def metadata(self):
+        """
+        Dictionary of metdata associated with the Communication Pass
+        """
         return self._metadata
 
 
@@ -661,17 +692,18 @@ class CommsPass(object):
 
     def add_communication(self, comm, **kwargs):
         """
-            Add a communication to the pass. The communication can be supplied
-            either as a string of HEX-pairs, as a bytearray, or as a Communications
-            object.
+            Add a communication to the pass. 
+            
+            The communication can be supplied either as a string of HEX-pairs, 
+            as a bytearray, or as a Communications object.
 
             If a HEX string or a bytearray is supplied, it will be converted to a
             Communication object internally
 
         Args:
-            comm:       The communication to add (either a hex string AB-CD-01-..., or a Communication object or an Action
-                        object
-            **kwargs:   Extra arguments passed to :class:`Communication` constructor in case comm is a hex string.
+            comm:       The communication to add (either a hex string ``"AB-CD-01-..."``,  a :class:`.Communication` object or 
+                        an :class:`Action` object
+            **kwargs:   Extra arguments passed to :class:`.Communication` constructor in case comm is a hex string.
 
         Returns:
             None
@@ -705,15 +737,16 @@ class CommsPass(object):
 
     def plot(self):
         """
-        Visualise the pass
-        NOT IMPLEMENTED
+        Visualise the pass. 
+        
+        **Not currently implemented**
         """
         raise Error("Not implemented")
 
 
     def to_dict(self):
         """
-        Convert class to a python dictionary
+        Convert class to a python dictionary.
         """
 
         d = dict(
@@ -725,7 +758,7 @@ class CommsPass(object):
 
     def copy(self):
         """
-        Create a copy of the class instance
+        Create a copy of the class instance.
         """
         return(CommsPass.from_dict(self.to_dict()))
 
@@ -735,10 +768,11 @@ class CommsPass(object):
         Classmethod to create CommsPass object from a python dict.
 
         Usage:
-            >>> cp = CommsPass.from_dict(dict_repr)
 
-        Arg:
-            d (dict): dictionary
+        >>> cp = CommsPass.from_dict(dict_repr)
+
+        Args:
+            d (dict): dictionary representation of CommsPass
 
         """
 
@@ -774,7 +808,7 @@ class CommsPass(object):
 
     def to_json(self):
         """
-        Convert the class to JSON representation
+        Convert the class to JSON representation.
         """
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
@@ -784,9 +818,10 @@ class CommsPass(object):
         Classmethod to Create CommsPass from a json string or from a json file.
 
         Usage:
-            >>> cp = CommsPass.from_dict(json_repr or json_file)
 
-        Arg:
+        >>> cp = CommsPass.from_dict(json_repr or json_file)
+
+        Args:
             json (fname or string): json string or file to load
         """
 
@@ -810,9 +845,8 @@ class Schedule(object):
     def __init__(self, passes=[], buffertime = SCHEDULE_BUFFERTIME):
         """
             Args:
-                passes (list(CommsPass)): List of CommsPass objects
-                buffertime (int, optional) : number of seconds to allow, as a minimum
-                    between two passes
+                passes (list(CommsPass))    : List of :class:`.CommsPass` objects
+                buffertime (int, optional)  : number of seconds to allow, as a minimum between two passes
         """
 
         #
@@ -870,7 +904,7 @@ class Schedule(object):
 
     def copy(self):
         """
-        Create a copy of the Schedule instance
+        Create a copy of the Schedule instance.
         """
         return(Schedule.from_dict(self.to_dict()))
 
@@ -880,7 +914,7 @@ class Schedule(object):
         Add a pass to the schedule
 
         Args:
-            tpass: The CommsPass instance to add
+            tpass: The :class:`.CommsPass` instance to add.
 
         """
 
@@ -895,10 +929,10 @@ class Schedule(object):
 
     def remove_pass(self, tpass):
         """
-        Remove a CommsPass instance from the schedule
+        Remove a :class:`.CommsPass` instance from the schedule
 
         Args:
-            tpass: The instance to remove
+            tpass (:class:`.CommsPass`): The instance to remove
 
         """
         self.passes.remove(tpass)
@@ -908,7 +942,7 @@ class Schedule(object):
         Pop the n'th pass from the schedule
 
         Args:
-            index: The index (or list of indexes) to pop
+            index (int): The index (or list of indexes) to pop
 
         """
         self.passes.pop(index)
@@ -941,10 +975,10 @@ class Schedule(object):
     @classmethod
     def from_dict(self, d):
         """
-        Classmethod to Create Schedule object from a python dict
+        Classmethod to Create Schedule object from a python dictionary representation of the schedule
 
-        Arg:
-            d (dict): dictionary
+        Args:
+            d (dict): dictionary representation of schedule
 
         """
         passes = [CommsPass.from_dict(x) for x in d['passes']]
@@ -957,7 +991,7 @@ class Schedule(object):
         """
         Classmethod to create Schedule from a json string or from a json file.
 
-        Arg:
+        Args:
             json (fname or string): json string or file to load
         """
 
