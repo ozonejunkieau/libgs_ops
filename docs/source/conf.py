@@ -108,7 +108,7 @@ html_theme_options = {
     'display_version': True,
     'prev_next_buttons_location': 'bottom',
     'style_external_links': False,
-    'vcs_pageview_mode': '',
+    #'vcs_pageview_mode': '',
     # Toc options
     'collapse_navigation': True,
     'sticky_navigation': True,
@@ -197,11 +197,12 @@ texinfo_documents = [
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/', None),
+    'python': ('https://docs.python.org/2.7/', None),
     'sqlalchemy': ('https://docs.sqlalchemy.org/en/latest/', None),
     'numpy': ('https://docs.scipy.org/doc/numpy/', None),
     'pandas': ('https://pandas.pydata.org/pandas-docs/stable', None),
-    'bokeh': ('https://bokeh.pydata.org/en/latest/', None)
+    'bokeh': ('https://bokeh.pydata.org/en/latest/', None),
+    'libgs': ('https://kworm1.github.io/libgs-docs/', None)
     }
 
 # -- Options for todo extension ----------------------------------------------

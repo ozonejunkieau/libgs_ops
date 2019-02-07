@@ -35,7 +35,201 @@ libgs_ops.scheduling
 :date: Sun Aug  6 17:36:19 2017
 :author: kjetil
 
+Usage
+-----
 
+.. note::
+    This example focues on the scheduler. Please see :mod:`.propagator` for instructions on how to compute
+    pass data (az, el and range_rate) for your pass. For the remainder of these tutorials it is assumed
+    that pdat exists.
+
+First the pass data must be converted into a :class:`CommsPass`:
+
+>>> cp = CommsPass(pdat, desc="Test pass")
+>>> cp
+Communication Pass:
+  Norad ID:       25544
+  Description:    Test pass
+  Visib. horizon: 10
+  Pass start:     2017/10/13 13:57:16
+  Pass end:       2017/10/13 14:03:58
+  Scheduled comms:
+   (no comms added but NOT listen mode)
+
+.. note::
+    The :class:`CommsPass` allows you to set arbitrary metadata. Such metadata will be stored in the pass database together with the schedule. 
+    It may also be used by a custom protocol that requires it. (See :class:`libgs.protocols.protocolbase.ProtocolBase`) 
+    The metadata can be seen in the :attr:`CommsPass.metadata` attribute. It is also directly accessible by the . operator, but 
+    the . operator can *not* be used to create new metadata. Either add it to the metadata dict, or on :class:`CommsPass` construction as 
+    in the example below.   
+
+>>> cp = CommsPass(pdat, hello=123, test=[1,2,3], another=dict(a=1,b=2))
+>>> cp.metadata
+{'another': {'a': 1, 'b': 2},
+ 'desc': None,
+ 'hello': 123,
+ 'horizon': 10.0,
+ 'listen': False,
+ 'nid': 25544,
+ 'test': [1, 2, 3]}
+>>> cp.test
+[1, 2, 3]
+
+Then add communications to the pass. There are several ways to specify the byte sequence of the communications. You can also set
+the ``retries`` parameter that specifies how many times to try again in case of failure.
+
+>>> cp.add_communication('DC-00-34-BB-AA')
+>>> cp.add_communication('AA-BB-CC-DD', retries=1)
+>>> cp.add_communication(bytearray([0xaa,0xab, 234,43,23,45]))
+>>> cp
+Communication Pass:
+  Norad ID:       25544
+  Description:    None
+  Visib. horizon: 10
+  Pass start:     2017/10/13 13:57:16
+  Pass end:       2017/10/13 14:03:58
+  Scheduled comms:
+     0 ( 3 retries) : DC-00-34-BB-AA
+     1 ( 1 retries) : AA-BB-CC-DD
+     2 ( 3 retries) : AA-AB-EA-2B-17-2D
+
+The scheduler also supports actions. :class:`Action` s refer to any functionality you may have implemented in the protocol's 
+:meth:`libgs.protocols.protocolbase.ProtocolBase.do_action` method,  and there is no standard format since the syntax depends on the function. 
+Assuming you have made some actions for starting and stopping comms, you could add them with something like this:
+
+>>> cp.add_communication(Action(("start_comms", 3), {'some_kwarg': 2}, desc="Start communication", retries=5))
+>>> cp.add_communication(Action(("stop_comms",)))
+>>> cp
+Communication Pass:
+  Norad ID:       25544
+  Description:    None
+  Visib. horizon: 10
+  Pass start:     2017/10/13 13:57:16
+  Pass end:       2017/10/13 14:03:58
+  Scheduled comms:
+     0 ( 3 retries) : DC-00-34-BB-AA
+     1 ( 1 retries) : AA-BB-CC-DD
+     2 ( 3 retries) : AA-AB-EA-2B-17-2D
+     3 ( 5 retries) : 'Start communication' <('start_comms', 3), {'some_kwarg': 2}>
+     4 ( 0 retries) : 'unnamed' <('stop_comms',), {}>
+
+In general it is recommended to only use one positional argument, (first tuple in :meth:`CommsPass.add_communication`) and keep action-specific parameters in the dictionary (second tuple).
+But this is not a requirement. See :meth:`libgs.protocols.protocolbase.ProtocolBase.do_action`.
+
+You can access the pass data in the commspass directly. This is exatly the same pdat structure you passed in on creation:
+
+>>> cp.pass_data.head()
+
+=============== ======================= =========== =========== ============
+.                tstamp_str              az          el          range_rate
+=============== ======================= =========== =========== ============
+43020.081435     2017/10/13 13:57:16     314.109     10.0034     -6800.68
+43020.081447     2017/10/13 13:57:17     314.111     10.1116     -6798.35
+43020.081458     2017/10/13 13:57:18     314.113     10.2206     -6795.98
+43020.081470     2017/10/13 13:57:19     314.115     10.3303     -6793.57
+43020.081481     2017/10/13 13:57:20     314.117     10.4407     -6791.12
+=============== ======================= =========== =========== ============
+
+To make a schedule, you need to add :class:`CommsPass`'es to a :class:`Schedule`:
+
+>>> s = Schedule()
+>>> s.add_pass(cp)
+>>> s
+---- -------- -------------------- -------------------- --------------
+#    Norad id Pass start (utc)     Pass end (utc)       Communications
+---- -------- -------------------- -------------------- --------------
+0    25544    2017/10/13 13:57:16  2017/10/13 14:03:58  5
+
+The schedule does not permit you to add overlapping passes:
+
+>>> s.add_pass(cp)
+Error: Can't add pass as it overlaps with another pass in the schedule
+
+It is often useful to dump the schedule to a file that can be shared with other operators or loaded into adfa-gs. 
+To dump a schedule to file in JSON format use the to_json() method:
+
+>>> with open('test.schedule', 'w') as fp:
+>>>    fp.write(s.to_json())
+
+To load it again, use from_json classmethod:
+
+>>> s2 = Schedule.from_json('test.schedule')
+
+The :class:`Schedule` provides several convenience functions. Check the help for details.
+
+The below complete example adds schedules for several upcoming passes, all with the same communication, and with an extra communication
+to the final:
+
+>>> passes = p.get_passes(25544, N=10, when='2017/10/14', horizon=10)
+>>> cps = []
+>>> for k,satpass in passes.iterrows():
+>>>    pdat, psum = p.compute_pass(satpass.nid, when=satpass.rise_t)
+>>>    cps += [CommsPass(pdat)]
+>>>    cps[-1].add_communication(bytearray([1,2,3,4]))
+>>> s = Schedule(cps)    
+>>> s.passes[-1].add_communication('AA-BB-CC-DD')
+>>> s
+---- -------- -------------------- -------------------- --------------
+#    Norad id Pass start (utc)     Pass end (utc)       Communications
+---- -------- -------------------- -------------------- --------------
+0 	25544 	2017/10/14 13:05:17 	2017/10/14 13:11:33 	1
+1 	25544 	2017/10/14 14:42:23 	2017/10/14 14:47:36 	1
+2 	25544 	2017/10/14 19:36:11 	2017/10/14 19:40:33 	1
+3 	25544 	2017/10/14 21:11:50 	2017/10/14 21:18:22 	1
+4 	25544 	2017/10/15 12:13:52 	2017/10/15 12:18:42 	1
+5 	25544 	2017/10/15 13:49:28 	2017/10/15 13:55:42 	1
+6 	25544 	2017/10/15 18:44:54 	2017/10/15 18:46:44 	1
+7 	25544 	2017/10/15 20:19:33 	2017/10/15 20:26:08 	1
+8 	25544 	2017/10/15 21:58:46 	2017/10/15 21:59:03 	1
+9 	25544 	2017/10/16 12:56:54 	2017/10/16 13:03:35 	2
+
+
+In some situations you may want to manually calculate the pointings of the antenna, or the schedule. 
+If so, just ensure you create a pdat in the correct format (i.e. with tstamp_str, az, el, range_rate as 
+appropriate - other headings do not matter):
+
+>>> pdat = pd.read_excel('passes_test.xlsx')
+>>> cp = CommsPass(pdat, nid=-1)
+
+.. note::
+   When specifying the pass data this way you will need  to specify which Norad ID the schedule is associated with since the 
+   excel file did not specify it. It does not have to be a valid NID, so if this was a testing pass we could for example set it to -1
+
+
+There are two main ways of executing the schedule on the groundstation depending on how you have implemented it.
+
+    1. You can start your software (and scheduler) by loading and running the schedule file.
+    2. You can start your software by starting the :class:`libgs.rpc.RPCSchedulerServer`. You will then be able to send
+       the schedule to the groundstation with a simple XMLRPC call via :class:`RPCSchedulerClient`.
+
+If :class:`libgs.rpc.RPCSchedulerServer` is running on the target ground station, you can upload a schedule as follows:
+
+>>> sch = RPCSchedulerClient(schedule=s, rpcaddr='http://xmlrpc/address/goes/here')
+
+.. note::
+   The syntax for rpcaddr is http(s)://<uname>:<passwd>@<host>:<port>/...
+   So if basic authentication has been enabled, or the rpc runs on an unsual port you can adjust as required
+
+:class:`RPCSchedulerClient` implements all the methods of the :class:`libgs.scheduler.Scheduler` so you can use it the same way:
+
+To start:
+
+>>> sch.execute()
+
+To stop (abort) a running schedule:
+
+>>> sch.stop()
+
+The scheduler implements two flags; track_full_pass and compute_ant_points. If the former has been set to true, 
+the antenna will keep tracking even after finishing its communications. 
+If the latter has been set to false, the antenna will stupidly execute every line in the schedule. 
+This is a really bad idea for automatically computed passes but you will probably want to use it if you are 
+pointing the antenna in a fixed direction for testing:
+
+>>> sch = RPCSchedulerClient(schedule=s, rpcaddr='http://rpc.mygroundstation.com:8000', track_full_pass=True, compute_ant_points=False)
+
+Module Reference
+----------------
 """
 
 import pandas as pd
@@ -52,8 +246,10 @@ log.addHandler(logging.NullHandler())
 
 
 class Error(Exception):
+    """ Generic Exception """
     pass
 
+#: Default buffertime
 SCHEDULE_BUFFERTIME = 180
 
 
@@ -71,15 +267,17 @@ class Action(dict):
         """
 
         Args:
-            args:    A list of arguments to pass to the :class:`libgs.protocols.ProtocolBase.do_action` function as positional arguments
-            kwargs:  A dictionary to pass to the :class:`libgs.protocols.ProtocolBase.do_action` function as kwargs.
-            desc:    The description of the action
-            retries: The number of times to retry the action in case of failure.
+            args (list or tuple):       A list of arguments to pass to the protocol's 
+                :meth:`~libgs.protocols.protocolbase.ProtocolBase.do_action` method as positional arguments
+            kwargs (dict):              A dictionary to pass to the protocol's 
+                :meth:`~libgs.protocols.protocolbase.ProtocolBase.do_action` method as kwargs.
+            desc (str(optional)):       The description of the action
+            retries (int(optional)):    The number of times to retry the action in case of failure.
 
         .. note::
 
             It is discouraged to use any positional arguments in the do_action function besides one, which is the
-            action selector. Then use kwargs for anything else. See  :class:`libgs.protocols.ProtocolBase` for additional
+            action selector. Then use kwargs for anything else. See  :class:`libgs.protocols.protocolbase.ProtocolBase` for additional
             information on this topic.
         """
 
@@ -132,6 +330,14 @@ class Communication(dict):
     It is just a convenience class that wraps and populates a dictionary
     properly for use by the other classes in this module.
 
+    It can be constructed with either a HEX string or a bytearray and will automatically compute the other. After construction
+    it will be a dictionary with the following fields:
+
+      * hexstr: Hex representation of byte stream
+      * barray: :class:`bytearray` represenation of bytestream
+      * retries: Number of retries
+      * wait:    Whether to wait for reply
+
 
     """
 
@@ -139,12 +345,9 @@ class Communication(dict):
         """
 
         Args:
-            cmd (string or bytearray): Command string (fully encoded) to send
-            to satellite.
-            retries (int): Number of times the command should be retried in
-            case of failure
-            wait (bool): Whether the ground station should wait for a reply
-            from the satellite or not.
+            cmd (basestring or bytearray): Command string (fully encoded) to send to satellite.
+            retries (int): Number of times the command should be retried in case of failure
+            wait (bool): Whether the ground station should wait for a reply from the satellite or not.
 
         """
 
@@ -190,9 +393,10 @@ class Communication(dict):
 
     def to_dict(self):
         """
-        Convert the class to a python dictionary format
+        Convert the class to a serialisable python dictionary format (gets rid of the bytearray entry).
+
         Returns:
-            A dictionary
+            A serialisable dictionary
 
         """
         # Turn to serialisable dict... we get rid of bytearray entry.
@@ -204,7 +408,12 @@ class Communication(dict):
 
 class CommsPass(object):
     """
-    Class to hold a communications pass
+    Class to hold a communications pass.
+
+    A CommsPass is defined as a pass data (az, el, range_rate) schedule with associated set of :class:`communications <.Communication>` 
+    and :class:`actions <.Action>`.
+
+    Arbitrary metadata (must be picklable) can also be added to the object.
 
     """
 
@@ -212,15 +421,15 @@ class CommsPass(object):
 
     def __init__(self, pass_data, desc=None, nid=None, horizon=0, comms=[], listen=False, **kwargs):
         """
-        Args;
-            pass_data (): Pandas DataFrame with at least az, el, range_rate columns
-            nid (int)   : Norad ID to associate with pass. Can be left empty if pass_data has a .nid field.
-            horizon (float): The lowest acceptable elevation for the pass. Pass_data will be cropped to the horizon
-            comms (list, optional) : List of communications (can be added with add_communications instead)
-            listen (bool, optional): Whether it is a listen pass or not
-            tle (str, optional)    : The TLE used for computing pass_data
+        Args:
+            pass_data (:class:`~pandas.DataFrame`): Dataframe with at least az, el, range_rate columns
+            nid (int)               : Norad ID to associate with pass. Can be left empty if pass_data has a .nid field.
+            horizon (float)         : The lowest acceptable elevation for the pass. Pass_data will be cropped to the horizon
+            comms (list, optional)  : List of communications (can be added with add_communications instead)
+            listen (bool, optional) : Whether it is a listen pass or not
+            tle (str, optional)     : The TLE used for computing pass_data
             protocol (str, optional): The protocol to use during the pass
-            **kwargs: Any other key=value pair to pass to scheduler to be logged
+            **kwargs                : Any other key=value pair to pass to scheduler to be logged (added to the metadata)
 
         """
         # NOTE: Internally, picklable arguments (i.e. everything except pass_data and comms) are
@@ -302,14 +511,27 @@ class CommsPass(object):
         self.metadata.update(kwargs)
 
 
-
-
-
+    # This private method is included for backwards compatability only.
     def _change_time(self, tstamp):
-        """
-        Debugging function: Adjusts the timestamp as required
-        If you run this it will not correspond to a real satellite anymore
+        self.change_time(tstamp)
 
+
+    def change_time(self, tstamp):
+
+        """
+        Modify the pass data start time.
+
+        If you run this the pass will not correspond to a real satellite pass anymore, but it is an extremely useful function when
+        testing an upcoming pass in a dry-run.
+
+        Example:
+
+        >>> cp.change_time('2019-11-01 12:32:42')
+
+        Will modify the commspass pass data so that it starts at ``2019-11-01 12:32:42``. Everything else stays the same.
+
+        Args:
+            tstamp: New timestamp (in any format supported by :class:`ephem.Date`, for example ISO string, or a python :class:`datetime.datetime`)
         """
         curt =  self.pass_data.index[0]
         newt = ephem.Date(tstamp)
@@ -402,8 +624,8 @@ class CommsPass(object):
         defined buffertime of the current pass finishing.
 
         Args:
-            other (CommsPass): The pass to compare with
-            buffertime (float): The time in seconds to allow as a minimum between passes
+            other (:class:`.CommsPass`): The pass to compare with
+            buffertime (float):         The time in seconds to allow as a minimum between passes
 
         """
         rt0 = pd.to_datetime(self.pass_data.iloc[0].tstamp_str)
@@ -425,6 +647,9 @@ class CommsPass(object):
 
     @property
     def metadata(self):
+        """
+        Dictionary of metdata associated with the Communication Pass
+        """
         return self._metadata
 
 
@@ -467,17 +692,18 @@ class CommsPass(object):
 
     def add_communication(self, comm, **kwargs):
         """
-            Add a communication to the pass. The communication can be supplied
-            either as a string of HEX-pairs, as a bytearray, or as a Communications
-            object.
+            Add a communication to the pass. 
+            
+            The communication can be supplied either as a string of HEX-pairs, 
+            as a bytearray, or as a Communications object.
 
             If a HEX string or a bytearray is supplied, it will be converted to a
             Communication object internally
 
         Args:
-            comm:       The communication to add (either a hex string AB-CD-01-..., or a Communication object or an Action
-                        object
-            **kwargs:   Extra arguments passed to :class:`Communication` constructor in case comm is a hex string.
+            comm:       The communication to add (either a hex string ``"AB-CD-01-..."``,  a :class:`.Communication` object or 
+                        an :class:`Action` object
+            **kwargs:   Extra arguments passed to :class:`.Communication` constructor in case comm is a hex string.
 
         Returns:
             None
@@ -511,15 +737,16 @@ class CommsPass(object):
 
     def plot(self):
         """
-        Visualise the pass
-        NOT IMPLEMENTED
+        Visualise the pass. 
+        
+        **Not currently implemented**
         """
         raise Error("Not implemented")
 
 
     def to_dict(self):
         """
-        Convert class to a python dictionary
+        Convert class to a python dictionary.
         """
 
         d = dict(
@@ -531,7 +758,7 @@ class CommsPass(object):
 
     def copy(self):
         """
-        Create a copy of the class instance
+        Create a copy of the class instance.
         """
         return(CommsPass.from_dict(self.to_dict()))
 
@@ -541,10 +768,11 @@ class CommsPass(object):
         Classmethod to create CommsPass object from a python dict.
 
         Usage:
-            >>> cp = CommsPass.from_dict(dict_repr)
 
-        Arg:
-            d (dict): dictionary
+        >>> cp = CommsPass.from_dict(dict_repr)
+
+        Args:
+            d (dict): dictionary representation of CommsPass
 
         """
 
@@ -580,7 +808,7 @@ class CommsPass(object):
 
     def to_json(self):
         """
-        Convert the class to JSON representation
+        Convert the class to JSON representation.
         """
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
@@ -590,9 +818,10 @@ class CommsPass(object):
         Classmethod to Create CommsPass from a json string or from a json file.
 
         Usage:
-            >>> cp = CommsPass.from_dict(json_repr or json_file)
 
-        Arg:
+        >>> cp = CommsPass.from_dict(json_repr or json_file)
+
+        Args:
             json (fname or string): json string or file to load
         """
 
@@ -616,9 +845,8 @@ class Schedule(object):
     def __init__(self, passes=[], buffertime = SCHEDULE_BUFFERTIME):
         """
             Args:
-                passes (list(CommsPass)): List of CommsPass objects
-                buffertime (int, optional) : number of seconds to allow, as a minimum
-                    between two passes
+                passes (list(CommsPass))    : List of :class:`.CommsPass` objects
+                buffertime (int, optional)  : number of seconds to allow, as a minimum between two passes
         """
 
         #
@@ -676,7 +904,7 @@ class Schedule(object):
 
     def copy(self):
         """
-        Create a copy of the Schedule instance
+        Create a copy of the Schedule instance.
         """
         return(Schedule.from_dict(self.to_dict()))
 
@@ -686,7 +914,7 @@ class Schedule(object):
         Add a pass to the schedule
 
         Args:
-            tpass: The CommsPass instance to add
+            tpass: The :class:`.CommsPass` instance to add.
 
         """
 
@@ -701,10 +929,10 @@ class Schedule(object):
 
     def remove_pass(self, tpass):
         """
-        Remove a CommsPass instance from the schedule
+        Remove a :class:`.CommsPass` instance from the schedule
 
         Args:
-            tpass: The instance to remove
+            tpass (:class:`.CommsPass`): The instance to remove
 
         """
         self.passes.remove(tpass)
@@ -714,7 +942,7 @@ class Schedule(object):
         Pop the n'th pass from the schedule
 
         Args:
-            index: The index (or list of indexes) to pop
+            index (int): The index (or list of indexes) to pop
 
         """
         self.passes.pop(index)
@@ -747,10 +975,10 @@ class Schedule(object):
     @classmethod
     def from_dict(self, d):
         """
-        Classmethod to Create Schedule object from a python dict
+        Classmethod to Create Schedule object from a python dictionary representation of the schedule
 
-        Arg:
-            d (dict): dictionary
+        Args:
+            d (dict): dictionary representation of schedule
 
         """
         passes = [CommsPass.from_dict(x) for x in d['passes']]
@@ -763,7 +991,7 @@ class Schedule(object):
         """
         Classmethod to create Schedule from a json string or from a json file.
 
-        Arg:
+        Args:
             json (fname or string): json string or file to load
         """
 

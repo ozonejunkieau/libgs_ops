@@ -35,6 +35,176 @@ libgs_ops.propagator
 :date:   Jan  2 10:10:48 2018
 :author: Kjetil Wormnes
 
+
+libgs_ops.propagator has been designed to allow you to design and plan satellite passes, and to calculate the data required by
+:mod:`.scheduling` when creating the Schedules to upload to the groundstation.
+
+Usage
+---------
+
+You can use TLEs from a database with the TLEDb interface:
+
+>>> p = Propagator(api=TLEDb('leo_tles.txt'), gs_lat = GS_LAT, gs_lon = GS_LON, gs_elev = GS_ELEV) #<-- replace path with a txt file of recent TLEs
+>>> p.get_tle(25544)
+('0 ISS (ZARYA)',
+ '1 25544U 98067A   17330.99569027  .00003456  00000-0  59208-4 0  9997',
+ '2 25544  51.6427 306.6944 0004138 155.0450 324.2726 15.54239375 87077')
+
+.. note::
+    This assumes the file leo_tles.txt exists, and is in the correct format. The file can contain many tles.
+    You can download tles from Space-Track.org. They need to be in the 3le format.
+
+A TLE that is not in the database will fail:
+
+>>> p.get_tle(40000)
+KeyError: 40000
+
+Or you can connect directly to spacetrack if you have login credentials. Note hat uname, pwd are your Space-Track.org 
+username and password. GS_LAT, GS_LON, GS_ELEV are the coordinates of your ground station.
+
+>>> p = Propagator(api=SpaceTrackAPI(uname, pwd), gs_lat = GS_LAT, gs_lon = GS_LON, gs_elev = GS_ELEV)
+
+Now we can get any TLE:
+
+>>> [p.get_tle(25544), p.get_tle(40000)]
+[('0 ISS (ZARYA)',
+  '1 25544U 98067A   18191.92601852  .00011951  00000-0  18828-3 0  9990',
+  '2 25544  51.6420 260.3859 0003584 301.4077  43.7815 15.54010757122205'),
+ ('0 FENGYUN 2C DEB',
+  '1 40000U 04042D   17363.55183407 -.00000332  00000-0  00000+0 0  9995',
+  '2 40000   9.4060  40.1038 0077532 344.5713  15.1779  1.00303233 32417')]
+
+
+Or you can even specify a TLE directly (only really useful for testing):
+
+>>> tle = \"""0 ISS (ZARYA)
+>>> 1 25544U 98067A   17284.88510854  .00004604  00000-0  76690-4 0  9997
+>>> 2 25544  51.6422 176.5756 0004586  12.7905  64.0182 15.54151166 79907\"""
+>>> p = Propagator(tles=tle, gs_lat = GS_LAT, gs_lon = GS_LON, gs_elev = GS_ELEV)
+
+
+The propagator provides many utility functions to allow you to easily visualise and plan passes. For this example, we will 
+work with the International Space Station (ISS) which has NORAD ID 25544. To print details about it, including
+where  it is at the moment:
+
+>>> p.print_info(25544)
+TLE (updated 12/04/2018 09:56:44):
+0 ISS (ZARYA)
+    1 25544U 98067A   17284.88510854  .00004604  00000-0  76690-4 0  9997
+    2 25544  51.6422 176.5756 0004586  12.7905  64.0182 15.54151166 79907
+\
+Orbit:
+        epoch (utc) : 2017/10/11 21:14:33
+        eccentricity: 0.000459
+        inclindation: 51.642200
+                RAAN: 176.575607
+                  AP: 12.790500
+       revol per day: 15.541512
+  mean anom at epoch: 64.018204
+   orbit no at epoch: 7990
+\
+Observer:
+                 lat: -35.291447
+                 lon: 149.165655
+                elev: 614
+          date (utc): 2018/04/11 23:56:55
+\
+Satellite:
+    ground track pos: (lat = 33.998, lon = -179.991)
+            pointing: (az  = 26.178, el  = -35.329)
+               range: 7997806.500000
+          range rate: 5306.109375
+            altitude: 400772.000000
+        orbit number: 10820.520789
+
+We can compute the details of the next pass using :meth:`Propagator.compute_pass`. It returns two tables, pdat and psum. 
+pdat includes deails about az, el and range_rate during the pass and is what the :class:`.Scheduler` will require (more about
+that later), and psum shows an overview:
+
+>>> pdat, psum = p.compute_pass(25544)
+>>> psum
+
+======= ======== ====================== =============== =========== =========== =============== =============== ============== ============ =========== ========
+.       norad_id tstamp_str             orbit_no        az          el          range           range_rate      altitude       lat          long        eclipsed
+======= ======== ====================== =============== =========== =========== =============== =============== ============== ============ =========== ========
+rise    25544    2018/4/12 12:56:27     10828.934071     341.021182 0.017601    2.362804e+06    -6453.000000    404883.78125   -15.640039   142.408351  True
+peak    25544    2018/4/12 13:01:33     10828.989114     50.446186  21.951227   9.426514e+05    57.450962       408999.65625   -30.219701   155.773119  True
+set     25544    2018/4/12 13:06:40     10829.044337     118.978849 0.075523    2.383968e+06    6468.492188     413027.25000   -42.669076   173.889048  True
+======= ======== ====================== =============== =========== =========== =============== =============== ============== ============ =========== ========
+
+.. note::
+    pdat (and psum) returns more information (columns) than are required by :class:`Schedule`, which only needs az, el and range_rate.
+
+Most of the other functionality in this module are subsets of :meth:`Propagator.get_all`:
+
+>>> p.get_all(25544)
+norad_id                    25544
+tstamp_str    2018/04/11 23:59:00
+orbit_no                  10820.5
+az                        28.9954
+el                       -39.2531
+range                 8.64443e+06
+range_rate                5033.92
+altitude                   402203
+lat                       39.1371
+long                     -172.682
+eclipsed                    False
+Name: 2018/04/11 23:59:00, dtype: object
+
+You can provide a when=keyword to specify when you want the details computed for, or even an array of timestamps:
+
+>>> p.get_all(25544, when=['2018/04/11 23:59:00', '2018/04/11 23:60:00', '2018/04/11 23:61:00'])
+
+======================= ========= ==================== ========= ======== ========= ============ =========== ========= ======== ========= =========
+.                       norad_id  tstamp_str           orbit_no  az       el        range        range_rate  altitude  lat      long      eclipsed
+======================= ========= ==================== ========= ======== ========= ============ =========== ========= ======== ========= =========
+2018/04/11 23:59:00     25544     2018/04/11 23:59:00  10820.5   28.9954  -39.2531  8.64443e+06  5033.92     402203    39.1371  -172.682  False
+2018/04/11 23:60:00     25544     2018/04/11 23:60:00  10820.6   30.3388  -41.12    8.94222e+06  4891.28     402885    41.401   -168.776  False
+2018/04/11 23:61:00     25544     2018/04/11 23:61:00  10820.6   31.6915  -42.9758  9.23124e+06  4741.58     403546    43.5045  -164.581  False
+======================= ========= ==================== ========= ======== ========= ============ =========== ========= ======== ========= =========
+
+A more complicated example to show how you can do anything you can do in python. 
+Requires mplleaflet to be installed (pip install mplleaflet):
+
+>>> import matplotlib.pyplot as plt
+>>> import mplleaflet
+>>> latlon = [p.get_ground_coord(25544, when=tstamp) for tstamp in pdat.tstamp_str]
+>>> lat, lon = zip(*latlon)
+>>> plt.plot(lon, lat, linewidth=3, color='r')
+>>> plt.plot(p.gs_lon, p.gs_lat, 'ro', markersize=10)
+>>> mplleaflet.display(tiles='esri_aerial')
+
+It can be useful to get an overview of upcoming satellite passes. Just use :meth:`Propagator.get_passes` to very quickly calculate upcoming
+passes. It also optionally accepts the ``when`` keyword in the same way as :meth:`Propagator.get_all` (if omitted when = Now) as well as ``N`` to specify the number
+of upcoming passes to calculate (if omitted N=1), and ``horizon`` to filter by passes that are higher than a certain elevation. For example:
+
+>>> p.get_passes([25544, 42778, 42017], N=1, horizon=10)
+
+=== ======= ============= ======================= ============== ======================= ============= ======================= =============
+.   nid     orbit_no      rise_t                  rise_az        max_elev_t              max_elev      set_t                   set_az
+=== ======= ============= ======================= ============== ======================= ============= ======================= =============
+0   42778   4451.856863   2018/04/12 11:00:07     150.894247     2018/04/12 11:05:31     18.542780     2018/04/12 11:10:50     19.517481
+1   42017   6406.847362   2018/04/12 12:10:13     169.722360     2018/04/12 12:16:10     83.098219     2018/04/12 12:22:01     345.571864
+2   25544   10832.568897  2018/04/12 14:03:15     308.388451     2018/04/12 14:08:46     69.318347     2018/04/12 14:14:22     133.721252
+=== ======= ============= ======================= ============== ======================= ============= ======================= =============
+
+.. note::
+    The horizon parameter just filters the rows to show anything with max_elev > horizon. rise_t and set_t still correspond to horizon=0. 
+    This is because get_passes uses a quick computation algorithm (See :meth:`ephem.Observer.next_pass`). To get the actual
+    rise_t and set_t for that horizon, run :meth:`Propagator.compute_pass` with ``when`` set to the corresponding rise_t.
+
+
+A common use of get_passes is to get the list of upcoming passes you want to create a schedule for. You then need to call compute_passes
+for each of the rows in the get_passes table by giving the ``when`` parameter as the corresponding rise_t. The below example uses the
+:func:`mpl_plot_pass` convenience function to plot a representation for each of the upcoming passes:
+
+>>> for k,satpass in p.get_passes([25544, 42778, 42017], N=1, horizon=10).iterrows():
+>>>     pdat, psum = p.compute_pass(satpass.nid, when=satpass.rise_t)   
+>>>     mpl_plot_pass(pdat) 
+
+Module reference
+----------------
+
 """
 from __future__ import print_function
 
@@ -48,6 +218,7 @@ from pandas import DataFrame
 import numpy as np
 from lxml import html
 import re
+from functools import wraps
 
 
 def _print( *arg, **kwarg):
@@ -68,6 +239,7 @@ def _print( *arg, **kwarg):
 
 
 class Error(Exception):
+    """ A generic exception """
     pass
 
 try:
@@ -87,6 +259,7 @@ log.addHandler(logging.NullHandler())
 # Decorator to more easily tag matplotlib functions
 def _mpl(func):
 
+    @wraps(func)
     def wrapper(*args, **kwargs):
         if not _HAS_MATPLOTLIB:
             raise Error("matplotib.pyplot not available, before using this funciton you need to install it : pip install matplotlib")
@@ -178,15 +351,21 @@ def mpl_plot_pass(angs, vishor=10):
 
 class SpaceTrackAPI(object):
     """
-        Class to interface with space-track.org
+        Class to interface with `space-track.org <https://www.space-track.org>`_.
+
+        This class connects to the space-track.org public API, and therefore requires a username and password. 
+        To obtain such credentials you can register for free on the space-track website.
+
+        This class allows the execution of arbitrary API queries, but provides a simplified method to download TLEs in
+        the format used by :class:`.Propagator`.
     """
 
     ST_URL='https://www.space-track.org'
 
     def __init__(self, uname, pwd):
         """
-        :param uname:
-        :param pwd:
+        :param uname: space-track.org user name
+        :param pwd: space-track.org password
         """
         r=requests.post(self.ST_URL+"/ajaxauth/login", json={'identity':uname, 'password':pwd})
 
@@ -201,7 +380,7 @@ class SpaceTrackAPI(object):
             Perform a raw query to spacetrack API. Can return anything the API
             can.
 
-            See `spacetrack <https://www.space-track.org/documentation#/api>`
+            See `spacetrack <https://www.space-track.org/documentation#/api>`_
             for the URI syntax.
 
             Args:
@@ -342,7 +521,22 @@ class SpaceTrackAPI(object):
 
     def get_tle_sets(self, name):
         """
-            A shortcut to some predefined sets of satellites
+            A shortcut to some predefined sets of satellites. 
+            
+            Avaliable sets are:
+
+            ============== ============================================================
+            'amateur_all'  space-track.org curated list of amateur radio satellites
+            'leo_all'      All satellites in LEO (period < 128 )
+            'geo_all'      All satellites in GEO (period between 1430 and 1450)
+            ============== ============================================================
+
+            Args:
+                name (str): The set to get (see above)
+
+            Returns:
+                Concatenated string of TLEs
+
         """
 
         if name == "amateur_all":
@@ -367,18 +561,19 @@ class SpaceTrackAPI(object):
     def get_tles(self, nids):
         """
             Query space-track for a series of norad IDs, and return
-            the NIDs and TLEs in a dict
+            the NIDs and TLEs in a dict.
+
+            .. note:: 
+                In some cases space-track can not find a TLE. **No error**
+                will be raised by this function and it is up to the caller
+                to check whether the returned NIDs match the passed ones.
 
             Args:
                 nids (list(int)): List of norad ids to query for
 
+            Returns:
+                Python dictionary of NIDS/TLES
 
-            Returns::
-                Dictionary of TLEs
-
-            .. note:: In some cases space-track can not find a TLE. No error
-                will be raised by this function and it is up to the caller
-                to check whether the returned NIDs match the passed ones.
 
         """
         idstr=",".join(str(x) for x in nids)
@@ -403,14 +598,20 @@ class TLEDb(object):
 
         The Database can be loaded from a file, or input directly.
 
-        This class can serve as a drop-in replacement for the SpaceTrackAPI class
-        in the propagator as it implements the get_tles method.
+        This class can serve as a drop-in replacement for :class:`.SpaceTrackAPI`
+        when creating a :class:`.Propagator` as it implements the ``get_tles`` method.
 
-        .. todo::
-            implement saving in binary format that is faster.
     """
 
     def __init__(self, fname=None, tles=None):
+        """
+        .. note::
+            Only one of the arguments (fname or tles) must be specified, and not both.
+
+        Args:
+            fname (str): The filename to load TLEs from
+            tles (dict or str): Manual specificaiton of TLES
+        """
         if (fname is not None) and (tles is not None):
             raise Error("only enter fname OR tles")
 
@@ -441,6 +642,14 @@ class TLEDb(object):
 
 
     def save_tles(self, fname, fformat='txt'):
+        """
+            Save the database to file.
+
+            Args:
+                fname (str): Filename to save to
+                fformat (str): Currently has to be 'txt'
+
+        """
 
         if fformat == 'txt':
             fp = open(fname, 'w')
@@ -448,8 +657,10 @@ class TLEDb(object):
             fp.write(tlestr)
             fp.close()
 
-        elif format == 'pickle':
+        elif fformat == 'pickle':
             pass
+        else:
+            raise Exception('Invalid file format {}'.format(fformat))
 
 
 
@@ -483,11 +694,20 @@ class TLEDb(object):
 
     def get_tles(self, nids):
         """
+            Query database for a series of norad IDs, and return
+            the NIDs and TLEs in a dict.
+
+            .. note:: 
+                If the NID is not in the database, **no error**
+                will be raised by this function and it is up to the caller
+                to check whether the returned NIDs match the passed ones.
+
             Args:
                 nids (list(int)): List of Norad IDs
 
-            Return:
-                TLEs
+            Returns:   
+                Python dictionary of NIDS/TLES
+
         """
 
         tles = dict()
@@ -502,32 +722,14 @@ class Propagator(object):
 
     Class to compute pointing angles for a satellite based on its Norad ID
 
-    Args:
-        api                             : API for TLE updates
-        tles (str)                      : TLEstring
-        gs_lat (:obj:`float`, optional) : latitude of ground station
-        gs_lon (float, optional)        : longitude of ground station
-        gs_elev (float, optional)       : elevation of ground station
-        tle_timeout (float, optional)   : Time in days before re-requesting new TLEs
-        nids (list(int), optional)      : List of NORAD IDs to track.
-            If a satellite is requested that is not in this list it will be
-            added and a full refresh of the TLEs from space-track initiated.
+    You can connect to a local Db using the TLEDb class, to spacetrack
+    using the SpaceTrackAPI class, or simply just specify the TLEs
+    directly as a string. The latter will use the manually input tles and never query space-track.
 
-    .. warning::
-        You can connect to a local Db using the TLEDb class, to spacetrack
-        using the SpaceTrackAPI class, or simply just specify the TLEs
-        directly as a string. The latter will use the manually input tles and never query space-track.
+    For a reference on TLEs see `Wikipedia <https://en.wikipedia.org/wiki/Two-line_element_set>`_
 
     .. note::
-        For a reference on TLEs see `Wikipedia <https://en.wikipedia.org/wiki/Two-line_element_set>`
-
-    .. note::
-        This class relies heavily on `py-ephem <http://rhodesmill.org/pyephem/>`
-
-    .. todo::
-        Get rid of the manual entry of TLE string. Itś depricated
-        with the TLEDb class.
-
+        This class relies heavily on `py-ephem <http://rhodesmill.org/pyephem/>`_
 
     """
 
@@ -544,6 +746,18 @@ class Propagator(object):
             tle_timeout=1,
             nids=[]
             ):
+        """
+        Args:
+            api                             : API for TLE updates
+            tles (str)                      : TLEstring
+            gs_lat (float, optional)        : latitude of ground station
+            gs_lon (float, optional)        : longitude of ground station
+            gs_elev (float, optional)       : elevation of ground station
+            tle_timeout (float, optional)   : Time in days before re-requesting new TLEs
+            nids (list(int), optional)      : List of NORAD IDs to track.
+                If a satellite is requested that is not in this list it will be
+                added and a full refresh of the TLEs from space-track initiated.
+        """
 
         if api is None and tles is None:
             raise Error('You have to specify either uname/pwd or tls')

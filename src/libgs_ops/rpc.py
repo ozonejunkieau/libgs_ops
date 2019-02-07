@@ -40,11 +40,16 @@ from xmlrpclib import ServerProxy, Transport
 
 class RPCClient(ServerProxy):
     """
-    An improvement on ye olde ServerProxy that
+    An improvement on ye olde :class:`~xmlrpclib.ServerProxy`.
+    
+    It is fully compatible with :class:`~xmlrpclib.ServerProxy` (i.e. it implements all the same methods and functionality),
+    and additionally it:
+
       * Times out if the connection has gone belly up
       * Allows kwargs to be passed along with arguments, by adding the kwargs as a single dictionary argument
         at the end of the list of parameters. If no kwargs are specified it will not be added, and therefore it
-        is fully backwards compatible with normal SimpleXMLRPCServer.
+        is fully backwards compatible with normal :class:`~SimpleXMLRPCServer.SimpleXMLRPCServer`.
+      * Properly implements ``__dir__`` and ``__getattr__`` to query for remote methods and interface with them as attributes
 
     """
     # This flag is added by the client to an argument dictionary to be treated as kwargs
@@ -64,6 +69,26 @@ class RPCClient(ServerProxy):
 
     def __init__(self, uri, timeout=60, transport=None, encoding=None, verbose=0,
                  allow_none=0, use_datetime=0):
+
+        """
+            .. note::
+                The RPCClient constructor accepts the same arguments as :class:`~xmlrpclib.ServerProxy` except you cannot set
+                the transport. The reason is that RPCClient uses its own custom transport to implement the timeout.
+
+            Args:
+                uri (str):          URI of XMLRPC Server (e.g. https:///my.server)
+                timeout (int):      Timeout in seconds to apply to queries to server
+                transport:          Not available (must be None)    
+                encoding:           Encoding to use
+                verbose:            Debugging flag
+                allow_none:         If true, None will be transmitted.
+                use_datetime:       If true, :class:`datetime.datetime` will be transmitted.
+
+            For further description of encoding, verbose, allow_none and use_datetime, see :class:`~xmlrpclib.ServerProxy`.
+
+            Available methods are those that have been registered on the remote XMLRPC server.
+
+        """
 
         if transport is not None:
             raise Exception("transport parameter is not allowed. This implementation uses a timeout transport")
