@@ -35,7 +35,7 @@ libgs_ops.rpc
 :author: Kjetil Wormnes
 """
 
-from xmlrpclib import ServerProxy, Transport
+from xmlrpc.client import ServerProxy, Transport
 
 
 class RPCClient(ServerProxy):

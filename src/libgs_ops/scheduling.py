@@ -238,7 +238,7 @@ import numpy as np
 import json
 import ephem
 import os
-from rpc import RPCClient
+from .rpc import RPCClient
 import logging
 log = logging.getLogger('libgs_ops-log')
 log.addHandler(logging.NullHandler())
@@ -351,7 +351,7 @@ class Communication(dict):
 
         """
 
-        if isinstance(cmd, basestring):
+        if isinstance(cmd, str):
             self._check_cmdstr(cmd)
             hexstr = cmd
             barray = bytearray([int(x, 16) for x in bytes.split('-')])
@@ -439,7 +439,7 @@ class CommsPass(object):
         #initialising _metadata attribute is a bit tricky since we have overloaded __setattr__
         object.__setattr__(self, '_metadata', {})
 
-        if not ('az' in pass_data.keys() and 'el'in pass_data.keys() and 'range_rate' in pass_data.keys() and 'tstamp_str'in pass_data.keys()):
+        if not ('az' in list(pass_data.keys()) and 'el'in list(pass_data.keys()) and 'range_rate' in list(pass_data.keys()) and 'tstamp_str'in list(pass_data.keys())):
             #print(pass_data.head())
             raise Error('Pass_data must be a dataframe with at least "az", "el", "range_rate" and "tstamp_str" columns')
 
@@ -449,7 +449,7 @@ class CommsPass(object):
         self.metadata['horizon'] = horizon
         self.metadata['desc'] =  desc
         
-        if hasattr(pass_data, 'TLE') and 'tle' not in kwargs.keys():
+        if hasattr(pass_data, 'TLE') and 'tle' not in list(kwargs.keys()):
             self.metadata['tle'] = pass_data.TLE
 
 
@@ -459,14 +459,14 @@ class CommsPass(object):
         if nid is None:
             if hasattr(pass_data, 'nid'):
 
-                if 'norad_id' in pass_data.keys():
+                if 'norad_id' in list(pass_data.keys()):
                     pd_nid = pass_data.norad_id.unique()
                     if (len(pd_nid) != 1) or (pd_nid[0] != pass_data.nid):
                         raise Error("nid is set as an attribute on pass_data and also as a norad_id column, but there is a mismatch")
 
                 self.nid=pass_data.nid
 
-            elif 'norad_id' in pass_data.keys():
+            elif 'norad_id' in list(pass_data.keys()):
                 pd_nid = pass_data.norad_id.unique()
                 if len(pd_nid) != 1:
                     raise Error("norad_id column is available in pass_data, but not unique - it should be")
@@ -666,7 +666,7 @@ class CommsPass(object):
         """
         Make it possible to access metadata directly through . operator
         """
-        if key in self.metadata.keys():
+        if key in list(self.metadata.keys()):
             self.metadata[key] = val
         else:
             object.__setattr__(self, key, val)
@@ -723,7 +723,7 @@ class CommsPass(object):
             self.comms.append(comm)
 
 
-        elif isinstance(comm, basestring) or isinstance(comm, bytearray):
+        elif isinstance(comm, str) or isinstance(comm, bytearray):
             self.comms.append(Communication(comm, **kwargs))
         else:
             raise Error("Invalid type for comms object: %s"%(type(comm)))
@@ -789,7 +789,7 @@ class CommsPass(object):
         del _metadata['comms']
         del _metadata['pass_data']
 
-        if '_metadata' in d.keys():
+        if '_metadata' in list(d.keys()):
             del _metadata['_metadata']
             _metadata.update(d['_metadata'])
         #################################
@@ -797,9 +797,9 @@ class CommsPass(object):
 
         cpass = CommsPass(pass_data, **_metadata)
         for k,c in enumerate(comms):
-            if 'args' in c.keys() and 'kwargs' in c.keys() and 'desc' in c.keys() and 'retries' in c.keys():
+            if 'args' in list(c.keys()) and 'kwargs' in list(c.keys()) and 'desc' in list(c.keys()) and 'retries' in list(c.keys()):
                 cpass.add_communication(Action(c['args'], c['kwargs'], retries=c['retries'], desc=c['desc']))
-            elif 'hexstr' in c.keys() and 'retries' in c.keys() and 'wait'in c.keys():
+            elif 'hexstr' in list(c.keys()) and 'retries' in list(c.keys()) and 'wait'in list(c.keys()):
                 cpass.add_communication(c['hexstr'], retries=c['retries'], wait=c['wait'])
             else:
                 raise Error("Invalid dict input to from_dict. Expected either Action or Communication in dict form, got %s"%(c))

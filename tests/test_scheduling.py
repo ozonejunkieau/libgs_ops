@@ -41,7 +41,7 @@ class Error(Exception):
 
 @pytest.mark.parametrize("data,retries", [
     ('CD-EF-00-01', 0),
-    (bytearray('\xcd\xef\x00\x01'),3),
+    (bytearray(b'\xcd\xef\x00\x01'),3),
 ])
 def test_Communication(data, retries):
     c = Communication(data, retries=retries)
@@ -129,8 +129,8 @@ def test_CommsPass_str(propagator):
      1 ( 3 retries) : 68-65-6C-6C-6F
 """
 
-    print("Expecting\n%s"%(expected))
-    print("Got:\n%s")%(c2.__str__())
+    print(("Expecting\n%s"%(expected)))
+    print(("Got:\n%s")%(c2.__str__()))
     assert(c2.__str__() == expected)
 
 
@@ -233,7 +233,7 @@ def test_Schedule(schedule):
   0002 38771    2017/8/10 21:51:01   2017/8/10 21:58:01   1
   ---- -------- -------------------- -------------------- --------------
 """
-        print("Expected:\n%s\nGot:\n%s"%(expected, str(schedule) ))
+        print(("Expected:\n%s\nGot:\n%s"%(expected, str(schedule) )))
 
         assert(str(schedule) == expected)
 

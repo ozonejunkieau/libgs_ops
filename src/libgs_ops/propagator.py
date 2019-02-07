@@ -206,7 +206,7 @@ Module reference
 ----------------
 
 """
-from __future__ import print_function
+
 
 import requests
 import ephem
@@ -508,7 +508,7 @@ class SpaceTrackAPI(object):
 
         URI = "/basicspacedata/query/class/tle_latest/format/3le/ordinal/1"
 
-        for k,v in params.items():
+        for k,v in list(params.items()):
             URI += "/" + k +"/"+v
 
         log.debug("Downloading TLE list using URI: %s"%(URI))
@@ -585,10 +585,10 @@ class SpaceTrackAPI(object):
         L0 = tlestr[0::3]
         L1 = tlestr[1::3]
         L2 = tlestr[2::3]
-        tle_list = zip(L0,L1,L2)
+        tle_list = list(zip(L0,L1,L2))
         nids = [int(x.split(b' ')[1]) for x in L2]
 
-        tles = dict(zip(nids, tle_list))
+        tles = dict(list(zip(nids, tle_list)))
 
         return tles
 
@@ -653,7 +653,7 @@ class TLEDb(object):
 
         if fformat == 'txt':
             fp = open(fname, 'w')
-            tlestr = '\r\n'.join(sum(self.tles.values(), ()))
+            tlestr = '\r\n'.join(sum(list(self.tles.values()), ()))
             fp.write(tlestr)
             fp.close()
 
@@ -685,10 +685,10 @@ class TLEDb(object):
             raise Error('Malformed TLE string')
 
 
-        tle_list = zip(L0,L1,L2)
+        tle_list = list(zip(L0,L1,L2))
         nids = [int(x[2:7]) for x in L2]
 
-        tles = dict(zip(nids, tle_list))
+        tles = dict(list(zip(nids, tle_list)))
 
         return tles
 
@@ -712,7 +712,7 @@ class TLEDb(object):
 
         tles = dict()
         for n in nids:
-            if n in self.tles.keys():
+            if n in list(self.tles.keys()):
                 tles[n] = self.tles[n]
 
         return tles
@@ -966,7 +966,7 @@ class Propagator(object):
             self._update_tles()
 
 
-        tles = self.tles.keys()
+        tles = list(self.tles.keys())
         tles.sort()
         self.nids_to_track.sort()
 
@@ -1044,7 +1044,7 @@ class Propagator(object):
 
         if when is None:
             when = [datetime.utcnow().strftime('%Y/%m/%d %H:%M:%S')]
-        elif isinstance(when, basestring):
+        elif isinstance(when, str):
             when = [when]
         elif not isinstance(when, Iterable):
             when = [when]
@@ -1237,7 +1237,7 @@ class Propagator(object):
 
         if when is None:
             obs.date = datetime.utcnow().strftime('%Y/%m/%d %H:%M:%S')
-        elif isinstance(when, unicode):
+        elif isinstance(when, str):
             obs.date = when.encode()
         else:
             obs.date = when
