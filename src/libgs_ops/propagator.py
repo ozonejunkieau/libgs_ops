@@ -579,14 +579,17 @@ class SpaceTrackAPI(object):
         idstr=",".join(str(x) for x in nids)
 
         tlestr = self.query_tle({'NORAD_CAT_ID':idstr})#.decode()
-        tlestr = tlestr.strip().replace(b'\r', b'').split(b'\n')
+        if isinstance(tlestr, bytes):
+            tlestr = tlestr.decode()
+        tlestr = tlestr.strip().replace('\r', '').split('\n')
+
 
 
         L0 = tlestr[0::3]
         L1 = tlestr[1::3]
         L2 = tlestr[2::3]
         tle_list = list(zip(L0,L1,L2))
-        nids = [int(x.split(b' ')[1]) for x in L2]
+        nids = [int(x.split(' ')[1]) for x in L2]
 
         tles = dict(list(zip(nids, tle_list)))
 
@@ -1237,8 +1240,8 @@ class Propagator(object):
 
         if when is None:
             obs.date = datetime.utcnow().strftime('%Y/%m/%d %H:%M:%S')
-        elif isinstance(when, str):
-            obs.date = when.encode()
+        # elif isinstance(when, str):  #<-- this does not work for py3, but may be necessary for py2 ... TODO
+        #     obs.date = when.encode()
         else:
             obs.date = when
 

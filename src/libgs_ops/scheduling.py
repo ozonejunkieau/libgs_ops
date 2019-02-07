@@ -354,7 +354,7 @@ class Communication(dict):
         if isinstance(cmd, str):
             self._check_cmdstr(cmd)
             hexstr = cmd
-            barray = bytearray([int(x, 16) for x in bytes.split('-')])
+            barray = bytearray([int(x, 16) for x in cmd.split('-')])
         elif isinstance(cmd, bytearray):
             hexstr = '-'.join(["%02X"%(x) for x in cmd])
             barray = cmd
@@ -478,6 +478,7 @@ class CommsPass(object):
             self.nid = nid
 
 
+        self.nid = int(self.nid)  # <--- ensure we dont get any funny numpy integer types
 
         #
         # Check timestamp
