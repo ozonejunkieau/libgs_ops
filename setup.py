@@ -140,7 +140,8 @@ setup(
         'pandas',
         'ephem',
         'requests',
-        'lxml'],
+        'lxml', 
+        'future'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"

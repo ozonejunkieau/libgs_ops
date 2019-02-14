@@ -1,22 +1,24 @@
-from __future__ import print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+
 import sys
 import argparse
 import pandas as pd
-from StringIO import StringIO
-from propagator import SpaceTrackAPI, Propagator
-from scheduling import CommsPass, Communication, Action, Schedule
+from io import StringIO
+from .propagator import SpaceTrackAPI, Propagator
+from .scheduling import CommsPass, Communication, Action, Schedule
 
 
 def _print(*args, **kwargs):
     print(*args,file=sys.stderr, **kwargs)
     
 def _fix_timestamp(when):
-    if not isinstance(when, basestring):
+    if not isinstance(when, string):
         raise Exception("_fix_timestamp requires a string")
     return pd.to_datetime(when).strftime("%Y/%m/%d %H:%M:%S")
     
 def _rev_timestamp(when):    
-    if not isinstance(when, basestring):
+    if not isinstance(when, string):
         raise Exception("_rev_timestamp requires a string")
     return pd.to_datetime(when).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -42,7 +44,7 @@ def download_tle():
         tles = api.query_tle(args.query_tle)
     elif len(args.nid) > 0:
         tles = api.get_tles(args.nid)
-        tles = "\n".join(["\n".join(v) for v in tles.values()])
+        tles = "\n".join(["\n".join(v) for v in list(tles.values())])
     else:
         _print("ERROR: Either -s, or -q or Norad IDs must be specified")
         exit(1)
@@ -445,7 +447,7 @@ def commspass():
                     cargs2 += [deduce_num(carg)]
                 
                 ckwargs2 = {}
-                for ckey, cval in ckwargs.items():
+                for ckey, cval in list(ckwargs.items()):
                     ckwargs2[deduce_num(ckey)] = deduce_num(cval)
                     
                 cargs = cargs2
@@ -482,7 +484,7 @@ def commspass():
     
 def schedule():
     import re
-    from xmlrpclib import ServerProxy
+    from xmlrpc.client import ServerProxy
     
     epilog = ""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description='Create/Manipulate a Schedule', epilog=epilog)
