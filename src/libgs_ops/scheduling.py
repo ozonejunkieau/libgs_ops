@@ -354,7 +354,7 @@ class Communication(dict):
         if isinstance(cmd, basestring):
             self._check_cmdstr(cmd)
             hexstr = cmd
-            barray = bytearray([int(x, 16) for x in bytes.split('-')])
+            barray = bytearray([int(x, 16) for x in hexstr.split('-')])
         elif isinstance(cmd, bytearray):
             hexstr = '-'.join(["%02X"%(x) for x in cmd])
             barray = cmd
