@@ -828,6 +828,8 @@ class Propagator(object):
         #    nids = self.nids_to_track
 
         if ext_tles is None:
+            # Sort the list of nids. This is done for compatibility with the get_tle method that enforces a sort on the TLE list.
+            self.nids_to_track.sort()
 
             self.tles = self.api.get_tles(self.nids_to_track)
             self.nids_to_track = list(self.tles.keys())
@@ -849,9 +851,8 @@ class Propagator(object):
                 raise Error('Malformed TLE string')
 
             nids = [int(x.split(' ')[1]) for x in  raw_tles[2::3]]
+
             self.nids_to_track = nids
-
-
 
             #
             # Create a tle dict
@@ -863,6 +864,10 @@ class Propagator(object):
                 self.tles[nid] = raw_tles[cnt:cnt+3]
                 #self.name2nid[self.raw_tles[cnt][2:]] = nid
                 cnt += 3
+
+
+        # Sort the list of nids. This is done for compatibility with the get_tle method that enforces a sort on the TLE list.
+        self.nids_to_track.sort()
 
         #
         # Save time for timeout calculation
